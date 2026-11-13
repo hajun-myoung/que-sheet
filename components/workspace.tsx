@@ -227,7 +227,7 @@ export function Workspace() {
             q<span>•</span>
           </span>
           <div>
-            큐<span>발표가 흐르는 곳</span>
+            큐:시트<span>매끄러운 발표를 한 곳에서</span>
           </div>
         </a>
         <div className="workspace-label">WORKSPACE</div>
