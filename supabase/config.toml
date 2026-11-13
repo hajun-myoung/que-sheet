@@ -1,0 +1,17 @@
+project_id = "cue-presentation"
+[api]
+enabled = true
+port = 54321
+[db]
+port = 54322
+major_version = 17
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://localhost:3000"]
+[storage]
+enabled = true
+file_size_limit = "20MiB"
+[functions.submit-pdf]
+verify_jwt = false
+# Function verifies JWT using auth.getUser(), supporting current publishable keys.
