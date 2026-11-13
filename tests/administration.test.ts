@@ -214,3 +214,136 @@ test("in-flight invitation mail cannot be canceled", async () => {
     /메일 발송/,
   );
 });
+
+test("registered member deletion covers each role, preserves teams/codes, and allows corrected registration", async () => {
+  const event = await setup(),
+    team = crypto.randomUUID();
+  await command(event, "team", {
+    id: team,
+    name: "잘못 선택한 팀",
+    description: "",
+    duration_seconds: null,
+  });
+  await db.query("select public.issue_participant_code($1,$2)", [event, team]);
+  for (const role of ["participant", "judge", "operator"]) {
+    const id = crypto.randomUUID(),
+      email = `${role}@example.com`,
+      request = crypto.randomUUID();
+    const payload = {
+      id,
+      email,
+      display_name: "오등록",
+      role,
+      registered_only: true,
+      ...(role === "participant" ? { team_id: team } : {}),
+    };
+    await command(event, "invite", payload);
+    await command(
+      event,
+      "registered_member_remove",
+      { invitation_id: id },
+      request,
+    );
+    await command(
+      event,
+      "registered_member_remove",
+      { invitation_id: id },
+      request,
+    );
+    assert.equal(
+      (await db.query("select * from public.invitations where id=$1", [id]))
+        .rows.length,
+      0,
+    );
+    await command(event, "invite", {
+      ...payload,
+      id: crypto.randomUUID(),
+      display_name: "정정 등록",
+    });
+  }
+  assert.equal(
+    (await db.query("select * from public.teams where id=$1", [team])).rows
+      .length,
+    1,
+  );
+  assert.equal(
+    (await db.query("select * from public.members where event_id=$1", [event]))
+      .rows.length,
+    1,
+  );
+  await db.exec("reset role");
+  assert.equal(
+    (
+      await db.query(
+        "select * from public.participant_codes where event_id=$1",
+        [event],
+      )
+    ).rows.length,
+    1,
+  );
+});
+test("registered deletion rejects other events, unauthorized actors, accepted and link-only invitations", async () => {
+  const event = await setup(),
+    otherEvent = await setup(),
+    id = crypto.randomUUID();
+  await command(event, "invite", {
+    id,
+    email: `${other}@example.com`,
+    display_name: "등록자",
+    role: "judge",
+    registered_only: true,
+  });
+  await assert.rejects(
+    command(otherEvent, "registered_member_remove", { invitation_id: id }),
+  );
+  await as(other);
+  await assert.rejects(
+    command(event, "registered_member_remove", { invitation_id: id }),
+  );
+  await db.query("select public.accept_invitation($1)", [id]);
+  await assert.rejects(
+    command(event, "registered_member_remove", { invitation_id: id }),
+  );
+  await as(op);
+  await assert.rejects(
+    command(event, "registered_member_remove", { invitation_id: id }),
+  );
+  const link = crypto.randomUUID();
+  await command(event, "invite", {
+    id: link,
+    email: "link@example.com",
+    display_name: "링크 초대",
+    role: "judge",
+    registered_only: false,
+  });
+  await assert.rejects(
+    command(event, "registered_member_remove", { invitation_id: link }),
+  );
+});
+test("registered deletion blocks sending but permits sent and uncertain mail cleanup", async () => {
+  const event = await setup();
+  for (const status of ["pending", "sending", "sent", "failed", "unknown"]) {
+    const id = crypto.randomUUID();
+    await as(op);
+    await command(event, "invite", {
+      id,
+      email: `${status}@example.com`,
+      display_name: status,
+      role: "judge",
+      registered_only: true,
+    });
+    await db.exec("reset role");
+    await db.query("update public.invitations set mail_status=$2 where id=$1", [
+      id,
+      status,
+    ]);
+    await as(op);
+    if (status === "sending")
+      await assert.rejects(
+        command(event, "registered_member_remove", { invitation_id: id }),
+        /메일 발송/,
+      );
+    else
+      await command(event, "registered_member_remove", { invitation_id: id });
+  }
+});

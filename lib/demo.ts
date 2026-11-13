@@ -245,12 +245,21 @@ export function reduce(
       }
       break;
     }
-    case "operator_invitation_cancel": {
+    case "operator_invitation_cancel":
+    case "registered_member_remove": {
       operator();
       const inv = s.invitations.find(
-        (i) => i.id === p.invitation_id && i.role === "operator" && !i.accepted,
+        (i) =>
+          i.id === p.invitation_id &&
+          (cmd.kind === "registered_member_remove"
+            ? i.registered_only
+            : i.role === "operator") &&
+          !i.accepted,
       );
-      check(inv, "대기 중인 운영자 초대가 없습니다.");
+      check(
+        inv,
+        "삭제 가능한 등록 멤버 또는 대기 중인 운영자 초대가 없습니다.",
+      );
       check(
         inv.mail_status !== "sending",
         "메일 발송이 끝난 뒤 초대를 취소해 주세요.",

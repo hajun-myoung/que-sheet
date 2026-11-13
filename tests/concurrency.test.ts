@@ -329,6 +329,48 @@ test(
         )
       ).rows[0].n;
       assert.equal(accepted, acceptance[1].status === "fulfilled" ? 1 : 0);
+      // A bulk-mail worker and registration deletion cannot both win.
+      const registeredInvite = crypto.randomUUID(),
+        attempt = crypto.randomUUID();
+      await command(a, "invite", {
+        id: registeredInvite,
+        role: "judge",
+        display_name: "등록 경합",
+        email: "registered-race@example.com",
+        registered_only: true,
+      });
+      const removalAndSend = await Promise.allSettled([
+        command(a, "registered_member_remove", {
+          invitation_id: registeredInvite,
+        }),
+        admin.query("select public.claim_invitation_email($1,$2,$3,$4) r", [
+          operator,
+          event,
+          registeredInvite,
+          attempt,
+        ]),
+      ]);
+      assert.equal(
+        removalAndSend.filter((x) => x.status === "fulfilled").length,
+        1,
+      );
+      if (removalAndSend[1].status === "fulfilled") {
+        assert.equal(removalAndSend[1].value.rows[0].r.status, "claimed");
+        await admin.query(
+          "select public.finish_invitation_email($1,$2,'sent',null)",
+          [registeredInvite, attempt],
+        );
+      } else {
+        assert.equal(
+          (
+            await admin.query(
+              "select count(*)::int n from public.invitations where id=$1",
+              [registeredInvite],
+            )
+          ).rows[0].n,
+          0,
+        );
+      }
       const deletes = await Promise.all([
         a.query("select public.begin_event_deletion($1,$2,$3) r", [
           operator,
