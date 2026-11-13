@@ -5,3 +5,4 @@ out/
 !.env.example
 *.tsbuildinfo
 public/pdf.worker.min.mjs
+supabase/.temp/

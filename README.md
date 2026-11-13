@@ -41,7 +41,7 @@ supabase db push
 supabase functions deploy submit-pdf --no-verify-jwt
 ```
 
-마이그레이션은 시간순으로 `supabase/migrations/202611120001_core.sql`, `supabase/migrations/202611130001_participant_access.sql`입니다. 두 번째 파일은 팀 정보·참여 코드·원자적 설문 제출을 추가합니다. 기존 설치는 `supabase db push`로 새 파일만 적용하고 Edge Function도 다시 배포하세요. CLI 이력 관리가 권장되며 이미 적용한 파일을 수동 재실행하지 마세요.
+마이그레이션은 시간순으로 `supabase/migrations/20261113130610_core.sql`, `supabase/migrations/20261113130628_participant_access.sql`입니다. 두 번째 파일은 팀 정보·참여 코드·원자적 설문 제출을 추가합니다. 세 번째 `20261113131412_access_query_indexes.sql`은 RLS 조회 최적화와 외래키 인덱스를 추가합니다. 기존 설치는 `supabase db push`로 새 파일만 적용하고 Edge Function도 다시 배포하세요. CLI 이력 관리가 권장되며 이미 적용한 파일을 수동 재실행하지 마세요.
 
 `--no-verify-jwt`는 Edge gateway의 구형 JWT 검사만 끕니다. 함수 자체는 **매 요청마다 `auth.getUser()`로 Bearer 토큰을 검증**합니다. 공개 요청은 거부합니다. Supabase가 함수 런타임에 주입하는 `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`를 사용합니다. service role 값은 브라우저·정적 호스팅 환경에 노출하면 안 됩니다.
 
@@ -116,3 +116,28 @@ CUE_TEST_DATABASE_URL=postgresql://USER@localhost:5432/cue_test_validation \
 요청에 따라 구현에 앞서 기존 작업을 기능별 5개 커밋으로 보관했습니다. 전체 변경 전 기준은 `3c9275a`입니다. 이 커밋의 프런트엔드와 Edge 코드를 사용하면 기존 화면으로 복구할 수 있습니다. 새 DB 마이그레이션은 추가형이므로 롤백 시 팀·제출 데이터를 삭제하지 마세요.
 
 이 실행 환경에서 기본 Turbopack 빌드는 로컬 포트 권한 오류가 발생했습니다. 동일 소스는 `npm run build -- --webpack`으로 검증할 수 있습니다.
+
+## 실제 프로젝트 연결
+
+`Academic Festival` (`nidalecwnnxlmxptibua`)에 연결했습니다. 이 작업 공간의 `.env.local`에는 Project URL과 publishable key만 있으며 Git에서 제외됩니다. 실제 연결 후에는 데모 역할 버튼과 `CUE2026` 같은 데모 코드가 적용되지 않습니다. 운영자 이메일 로그인 → 행사 생성 → 팀 등록 → 참여 코드 발급 순서로 시작하세요.
+
+원격 최초 배포 시 Supabase가 발급한 migration version에 맞춰 기존 두 SQL 파일 이름을 정렬했습니다. SQL 내용은 그대로이며, `supabase db push`가 이미 설치된 테이블을 재생성하지 않도록 원격 이력과 이름을 맞춘 것입니다. 초기 데모 시절 파일 이름은 이전 Git 커밋에서 확인할 수 있습니다. 이후 원격 이력과 로컬 파일을 각각 수정하지 말고 함께 관리하세요.
+
+### Google Workspace SMTP
+
+[Supabase SMTP 설정](https://supabase.com/dashboard/project/nidalecwnnxlmxptibua/auth/smtp)에서 Custom SMTP를 활성화하고 아래 값을 입력합니다.
+
+| 항목         | 값                                   |
+| ------------ | ------------------------------------ |
+| Sender email | 실제 Google Workspace 이메일         |
+| Sender name  | 큐:시트                              |
+| Host         | `smtp.gmail.com`                     |
+| Port         | `587` (TLS)                          |
+| Username     | Sender email과 같은 전체 이메일 주소 |
+| Password     | 해당 Google 계정의 앱 비밀번호       |
+
+앱 비밀번호는 2단계 인증을 켠 계정에서 직접 발급합니다. 학교 관리 정책에 따라 발급이 제한될 수 있으며, 이 경우 학교 관리자 승인이나 별도 SMTP 제공자가 필요합니다. 비밀번호는 Supabase에만 입력하고 저장소·채팅에 남기지 마세요. [Google SMTP 안내](https://knowledge.workspace.google.com/admin/gmail/send-email-from-a-printer-scanner-or-app), [앱 비밀번호 안내](https://support.google.com/accounts/answer/185833).
+
+기본 Supabase 메일 서버는 프로젝트 단위 시간당 2통으로 제한되고 프로젝트 팀에 등록된 이메일로만 발송합니다. Custom SMTP를 저장한 뒤 [Auth Rate Limits](https://supabase.com/dashboard/project/nidalecwnnxlmxptibua/auth/rate-limits)에서 이메일 발송 한도를 확인하세요. `email rate limit exceeded`가 계속되면 기존 2통 제한이 남아 있는지 확인합니다. [Supabase SMTP 문서](https://supabase.com/docs/guides/auth/auth-smtp).
+
+로컬 로그인용 [URL Configuration](https://supabase.com/dashboard/project/nidalecwnnxlmxptibua/auth/url-configuration)은 Site URL `http://localhost:3000`, Redirect URLs `http://localhost:3000/**`로 설정합니다. 실제 웹 호스팅 주소가 정해지면 HTTPS 주소를 추가하고 Site URL도 변경하세요.

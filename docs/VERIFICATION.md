@@ -1,3 +1,28 @@
+# 실제 Supabase 연결 — 2026-11-13
+
+프로젝트: `Academic Festival` (`nidalecwnnxlmxptibua`), PostgreSQL 17.11.
+
+완료:
+
+- 초기 앱 스키마와 참여 코드 마이그레이션 적용. 로컬 파일 버전을 원격 이력과 일치시킴: `20261113130610`, `20261113130628`.
+- RLS 조회 최적화·외래키 인덱스 마이그레이션 `20261113131412` 적용.
+- `submit-pdf` Edge Function v2 활성화. `index.ts`, `pdf.ts`, `deno.json`, `deno.lock` 배포. 함수 내부에서 매 요청 `auth.getUser()` 및 행사·팀 역할 검증.
+- `.env.local`에 프로젝트 URL과 publishable key 설정. Git 제외 확인. 서비스 역할 비밀키는 로컬에 저장하지 않음.
+- 13개 앱 테이블 모두 RLS 활성화. `presentations` 비공개, PDF만 허용, 20MiB 상한. `event_updates` Realtime publication 확인.
+- 실제 HTTP 검증: 비로그인 행사 SELECT / RPC / 업로드는 각각 401. 익명 Auth 로그인은 200, 미배정 사용자의 행사 목록은 빈 배열, 잘못된 코드 거절, 익명 사용자의 운영자 행사 생성 거절.
+- 추가 마이그레이션 포함 로컬 테스트 22개 통과·외부 PostgreSQL 경합 1개 skip, TypeScript 통과.
+
+진단 검토:
+
+- RLS에서 `auth.uid()`가 행마다 평가되던 성능 경고 4개 해결.
+- 보안 진단의 authenticated SECURITY DEFINER RPC 8개는 역할·팀·행사 검증을 수행하는 의도된 앱 진입점/정책 helper다. 비로그인 실행 권한은 제거되어 있고, 제출 확정 RPC는 service_role만 실행할 수 있다. [진단 설명](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable).
+- `participant_codes`, `code_attempts`의 정책 없음 INFO는 직접 접근을 차단하는 의도된 설정이다. [진단 설명](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy).
+- `events(id,current_rubric_id)` 인덱스 INFO는 id PK로 최대 한 행을 찾으므로 중복 인덱스를 추가하지 않았다. 새 인덱스의 unused INFO는 데이터가 없는 신규 설치 시점 결과다. [인덱스 진단](https://supabase.com/docs/guides/database/database-linter?lint=0001_unindexed_foreign_keys).
+
+인증 발송 확인 중: 기본 제공 메일 서버에서 `over_email_send_rate_limit`(429)을 확인했고 사용자 지정 Google Workspace SMTP로 전환했다. 이후 Gmail이 `535 5.7.8`을 반환하여, 사용자가 해당 계정의 앱 비밀번호를 재확인 중이다. 메일 수신·실제 운영자 행사 생성·인증된 PDF 업로드는 아직 완료 판정하지 않는다.
+
+---
+
 # 로그인·참여자 설문·발표 연습 검증 — 2026-11-13
 
 ## 이번 변경의 자동 검증
