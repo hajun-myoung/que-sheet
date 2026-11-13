@@ -59,6 +59,7 @@ import { AccessScreen } from "./access-screen";
 import { ParticipantForm } from "./participant-form";
 import { Practice } from "./practice";
 import { SettingsPanel } from "./settings";
+import Footer from "./footer";
 export function Workspace() {
   const confirm = useConfirm();
   const store = useWorkspace(),
@@ -885,13 +886,7 @@ export function Workspace() {
                   )}
                 </div>
               </div>
-              <footer className="page-footer">
-                <span>큐 · 좋은 발표에 집중하세요.</span>
-                <span>
-                  <ShieldCheck size={13} />
-                  안전하게 보관되는 발표자료
-                </span>
-              </footer>
+              <Footer />
             </>
           )}
           {view === "results" && operator && (

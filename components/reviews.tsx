@@ -18,6 +18,7 @@ import {
   type Team,
   type Command,
 } from "@/lib/model";
+import Footer from "./footer";
 export function ReviewForm({
   data,
   team,
@@ -394,6 +395,7 @@ export function Results({
         평가 기준 버전이 다른 결과는 단순 순위로 합산하지 않습니다. 각 결과에
         적용된 기준과 배점을 함께 확인하세요.
       </p>
+      <Footer />
     </div>
   );
 }

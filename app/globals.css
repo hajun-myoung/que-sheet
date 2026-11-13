@@ -1134,7 +1134,9 @@ button:not(:disabled):active {
   justify-content: space-between;
   font-size: 9px;
   color: #ad9ca7;
-  padding: 27px 0 23px;
+  padding: 12px 0 23px;
+  border-top: 0.5px gray dashed;
+  margin-top: 15px;
 }
 .page-footer > span:last-child {
   display: flex;

@@ -23,6 +23,7 @@ import {
   type Criterion,
   type Role,
 } from "@/lib/model";
+import Footer from "./footer";
 export function SettingsPanel({
   data,
   run,
@@ -591,6 +592,7 @@ export function SettingsPanel({
           {notice}
         </div>
       )}
+      <Footer />
     </div>
   );
 }
