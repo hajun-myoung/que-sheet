@@ -446,6 +446,8 @@ button:not(:disabled):active {
   border-top: 1px solid var(--line);
 }
 .avatar {
+  flex-shrink: 0;
+  aspect-ratio: 1;
   background: #eee7eb;
   width: 34px;
   height: 34px;
@@ -458,6 +460,7 @@ button:not(:disabled):active {
 }
 .nav-user > div {
   flex: 1;
+  min-width: 0;
 }
 .nav-user strong {
   font-size: 11px;
@@ -3108,4 +3111,43 @@ progress {
   .survey-submit .btn {
     width: 100%;
   }
+}
+
+.nav-user strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.registered-members {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0;
+}
+.registered-member {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--brand-border);
+  border-radius: 10px;
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.deletion-recovery {
+  margin: 16px 0;
+}
+.deletion-recovery .btn {
+  margin: 8px 8px 0 0;
+}
+
+.event-delete-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
 }
