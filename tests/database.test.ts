@@ -47,6 +47,12 @@ before(async () => {
   await db.exec(
     readFileSync("supabase/migrations/202611120001_core.sql", "utf8"),
   );
+  await db.exec(
+    readFileSync(
+      "supabase/migrations/202611130001_participant_access.sql",
+      "utf8",
+    ),
+  );
   await db.query("insert into auth.users(id) select unnest($1::uuid[])", [
     [op, participant, judge, outsider, otherParticipant],
   ]);
@@ -386,4 +392,151 @@ test("cross-event roles do not confer access and invitations require verified ma
       ),
     /접근 권한/,
   );
+});
+
+test("participant codes are operator-issued, scoped, rotated, expiring and throttled", async () => {
+  const newcomer = uid(6),
+    anonymous = uid(7);
+  await db.exec("reset role");
+  await db.query(
+    "insert into auth.users(id,email_confirmed_at) values($1,null),($2,null)",
+    [newcomer, anonymous],
+  );
+  await as(participant);
+  await assert.rejects(
+    () =>
+      db.query("select public.issue_participant_code($1,$2)", [event, team]),
+    /운영자/,
+  );
+  await assert.rejects(
+    () => db.query("select * from public.participant_codes"),
+    /permission denied/,
+  );
+  await as(op);
+  async function issue(t = team) {
+    return (
+      await db.query<{ r: { code: string } }>(
+        "select public.issue_participant_code($1,$2) r",
+        [event, t],
+      )
+    ).rows[0].r.code;
+  }
+  async function redeem(code: string) {
+    return (
+      await db.query<{ r: any }>(
+        "select public.redeem_participant_code($1) r",
+        [code],
+      )
+    ).rows[0].r;
+  }
+  const old = await issue(),
+    code = await issue(),
+    otherCode = await issue(otherTeam);
+  await as(newcomer);
+  assert.match((await redeem(old)).error, /올바르지/);
+  assert.equal(
+    (
+      await redeem(
+        code
+          .toLowerCase()
+          .match(/.{1,8}/g)!
+          .join("-"),
+      )
+    ).team_id,
+    team,
+  );
+  assert.equal((await snapshot()).me.role, "participant");
+  assert.equal((await snapshot()).teams.length, 1);
+  assert.match((await redeem(otherCode)).error, /다른 역할이나 팀/);
+  await assert.rejects(
+    () => db.query("select public.create_event($1,$2)", ["권한 상승", uid(99)]),
+    /이메일 인증/,
+  );
+  await assert.rejects(
+    () =>
+      db.query("select public.create_event_verified($1,$2)", ["우회", uid(99)]),
+    /permission denied/,
+  );
+  await as(op);
+  assert.match((await redeem(code)).error, /다른 역할/);
+  await db.exec("reset role");
+  await db.query(
+    "update public.participant_codes set expires_at=now()-interval '1 second' where team_id=$1",
+    [team],
+  );
+  await as(anonymous);
+  assert.match((await redeem(code)).error, /올바르지/);
+  for (let i = 0; i < 9; i++)
+    assert.match((await redeem("invalid")).error, /올바르지/);
+  assert.match((await redeem(otherCode)).error, /시도 횟수/);
+  await assert.rejects(
+    () => db.query("select * from public.code_attempts"),
+    /permission denied/,
+  );
+  // Rotation does not silently revoke a previously granted team membership.
+  await as(newcomer);
+  assert.equal((await snapshot()).me.team_id, team);
+});
+
+test("survey profile and PDF commit atomically, with idempotency and ownership checks", async () => {
+  const profile = {
+    name: "설문 팀",
+    leader_name: "팀장",
+    member_names: ["팀원 A", "팀원 B"],
+  };
+  const id = uid(50),
+    next = uid(51);
+  async function submit(
+    actor: string,
+    previous: string | null,
+    fileId: string,
+    p: unknown,
+  ) {
+    return db.query(
+      "select public.finalize_submission_with_profile($1,$2,$3,$4,$5,$6,$7,6,5000,$8::jsonb)",
+      [
+        actor,
+        event,
+        otherTeam,
+        previous,
+        fileId,
+        "설문.pdf",
+        `${event}/${otherTeam}/${fileId}.pdf`,
+        JSON.stringify(p),
+      ],
+    );
+  }
+  await as(otherParticipant);
+  await assert.rejects(
+    () => submit(otherParticipant, null, id, profile),
+    /permission denied/,
+  );
+  await db.exec("reset role; set role service_role");
+  await assert.rejects(() => submit(participant, null, id, profile));
+  await assert.rejects(() =>
+    submit(otherParticipant, null, id, { ...profile, leader_name: "" }),
+  );
+  await submit(otherParticipant, null, id, profile);
+  await submit(otherParticipant, null, id, profile);
+  await assert.rejects(
+    () => submit(otherParticipant, null, id, { ...profile, name: "다른 내용" }),
+    /다릅니다/,
+  );
+  await assert.rejects(
+    () => submit(otherParticipant, null, next, { ...profile, name: "충돌" }),
+    /변경/,
+  );
+  await as(op);
+  let t = (await snapshot()).teams.find((t: any) => t.id === otherTeam);
+  assert.equal(t.name, profile.name);
+  assert.equal(t.leader_name, profile.leader_name);
+  assert.deepEqual(t.member_names, profile.member_names);
+  assert.equal(t.submission_id, id);
+  await db.exec("reset role; set role service_role");
+  await submit(otherParticipant, id, next, { ...profile, name: "최신 팀" });
+  await submit(otherParticipant, null, id, profile);
+  await as(op);
+  t = (await snapshot()).teams.find((t: any) => t.id === otherTeam);
+  assert.equal(t.name, "최신 팀");
+  assert.equal(t.submission_id, next);
 });

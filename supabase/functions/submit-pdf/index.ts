@@ -84,11 +84,25 @@ Deno.serve(async (req) => {
       return json({ error: "제출 권한이 없습니다." }, 403);
     const { data: allowedTeam } = await client
       .from("teams")
-      .select("id")
+      .select("id,submission_id")
       .eq("event_id", event)
       .eq("id", team)
       .single();
     if (!allowedTeam) return json({ error: "팀을 찾을 수 없습니다." }, 403);
+    let profile: unknown = undefined;
+    if (form.has("profile")) {
+      try {
+        profile = JSON.parse(String(form.get("profile")));
+      } catch {
+        return json({ error: "팀 정보 형식이 올바르지 않습니다." }, 400);
+      }
+    }
+    if (
+      member.role === "participant" &&
+      !allowedTeam.submission_id &&
+      profile === undefined
+    )
+      return json({ error: "팀 정보와 PDF를 함께 제출해 주세요." }, 400);
     const file = form.get("file");
     if (
       !(file instanceof File) ||
@@ -128,7 +142,7 @@ Deno.serve(async (req) => {
     if (existing) {
       if (existing.path !== path || existing.name !== file.name)
         return json({ error: "동일 요청 ID의 파일이 다릅니다." }, 409);
-      return json(existing);
+      if (profile === undefined) return json(existing);
     }
     const { error: uploadError } = await admin.storage
       .from("presentations")
@@ -149,17 +163,23 @@ Deno.serve(async (req) => {
       if (error || !object)
         return json({ error: "저장소 확인에 실패했습니다." }, 502);
     }
-    const { data, error } = await admin.rpc("finalize_submission", {
-      p_actor: user.id,
-      p_event: event,
-      p_team: team,
-      p_previous: previous,
-      p_id: id,
-      p_name: file.name,
-      p_path: path,
-      p_pages: pages,
-      p_bytes: file.size,
-    });
+    const { data, error } = await admin.rpc(
+      profile === undefined
+        ? "finalize_submission"
+        : "finalize_submission_with_profile",
+      {
+        p_actor: user.id,
+        p_event: event,
+        p_team: team,
+        p_previous: previous,
+        p_id: id,
+        p_name: file.name,
+        p_path: path,
+        p_pages: pages,
+        p_bytes: file.size,
+        ...(profile === undefined ? {} : { p_profile: profile }),
+      },
+    );
     if (error) {
       const { data: reference } = await admin
         .from("submissions")

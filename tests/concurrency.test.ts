@@ -24,6 +24,12 @@ test(
       await admin.query(
         readFileSync("supabase/migrations/202611120001_core.sql", "utf8"),
       );
+      await admin.query(
+        readFileSync(
+          "supabase/migrations/202611130001_participant_access.sql",
+          "utf8",
+        ),
+      );
       const operator = crypto.randomUUID(),
         judge = crypto.randomUUID(),
         event = crypto.randomUUID(),
@@ -138,6 +144,81 @@ test(
       ]);
       assert.equal(reviews.filter((x) => x.status === "fulfilled").length, 1);
       assert.equal(reviews.filter((x) => x.status === "rejected").length, 1);
+      const otherTeam = crypto.randomUUID(),
+        newcomer = crypto.randomUUID();
+      await command(a, "team", {
+        id: otherTeam,
+        name: "다른 코드 팀",
+        description: "",
+        duration_seconds: null,
+      });
+      await admin.query(
+        "insert into auth.users(id,email_confirmed_at) values($1,null)",
+        [newcomer],
+      );
+      const code1 = (
+        await a.query("select public.issue_participant_code($1,$2) r", [
+          event,
+          team,
+        ])
+      ).rows[0].r.code;
+      const code2 = (
+        await b.query("select public.issue_participant_code($1,$2) r", [
+          event,
+          otherTeam,
+        ])
+      ).rows[0].r.code;
+      const n1 = await actor(newcomer),
+        n2 = await actor(newcomer);
+      const redemptions = await Promise.all([
+        n1.query("select public.redeem_participant_code($1) r", [code1]),
+        n2.query("select public.redeem_participant_code($1) r", [code2]),
+      ]);
+      assert.equal(redemptions.filter((r) => !r.rows[0].r.error).length, 1);
+      assert.equal(
+        (
+          await admin.query(
+            "select * from public.members where event_id=$1 and user_id=$2",
+            [event, newcomer],
+          )
+        ).rowCount,
+        1,
+      );
+      // Team profile changes and file pointer must choose the same winning submission.
+      const newId1 = crypto.randomUUID(),
+        newId2 = crypto.randomUUID();
+      const profile1 = {
+        name: "첫 제출",
+        leader_name: "리더",
+        member_names: [],
+      };
+      const finalize = (c: Client, id: string, name: string) =>
+        c.query(
+          "select public.finalize_submission_with_profile($1,$2,$3,null,$4,$5,$6,6,1000,$7::jsonb)",
+          [
+            operator,
+            event,
+            otherTeam,
+            id,
+            "test.pdf",
+            `${event}/${otherTeam}/${id}.pdf`,
+            JSON.stringify({ ...profile1, name }),
+          ],
+        );
+      await a.query("reset role");
+      await b.query("reset role");
+      const swaps = await Promise.allSettled([
+        finalize(a, newId1, "첫 제출"),
+        finalize(b, newId2, "둘째 제출"),
+      ]);
+      assert.equal(swaps.filter((r) => r.status === "fulfilled").length, 1);
+      const winner = (
+        await admin.query(
+          "select t.name,s.team_profile->>'name' profile_name from public.teams t join public.submissions s on s.id=t.submission_id where t.id=$1",
+          [otherTeam],
+        )
+      ).rows[0];
+      assert.equal(winner.name, winner.profile_name);
     } finally {
       await Promise.all(clients.map((c) => c.end()));
       await admin.end();

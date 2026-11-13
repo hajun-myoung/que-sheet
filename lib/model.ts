@@ -29,6 +29,8 @@ export type Team = {
   sort_index: number;
   duration_seconds: number | null;
   submission_id: string | null;
+  leader_name?: string;
+  member_names?: string[];
 };
 export type Submission = {
   id: string;
@@ -233,4 +235,30 @@ export function durationLabel(seconds: number) {
       .filter(Boolean)
       .join(" ") || "0초"
   );
+}
+
+export type TeamProfile = {
+  name: string;
+  leader_name: string;
+  member_names: string[];
+};
+export function validateTeamProfile(profile: TeamProfile) {
+  if (
+    !profile ||
+    typeof profile.name !== "string" ||
+    !profile.name.trim() ||
+    profile.name.trim().length > 80 ||
+    typeof profile.leader_name !== "string" ||
+    !profile.leader_name.trim() ||
+    profile.leader_name.trim().length > 80 ||
+    !Array.isArray(profile.member_names) ||
+    profile.member_names.length > 30 ||
+    profile.member_names.some(
+      (n) => typeof n !== "string" || !n.trim() || n.trim().length > 80,
+    )
+  )
+    throw Error("팀명·팀장 이름은 1~80자, 팀원은 최대 30명으로 입력해 주세요.");
+}
+export function normalizeCode(code: string) {
+  return code.toUpperCase().replace(/[-\s]/g, "");
 }
