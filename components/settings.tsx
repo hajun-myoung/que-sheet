@@ -234,7 +234,7 @@ export function SettingsPanel({
       )}
       {tab === "teams" && (
         <div className="settings-grid">
-          <ParticipantCodes data={data} refresh={refresh} />
+          <ParticipantCodes data={data} refresh={refresh} run={run} />
           <section className="card settings-card">
             <h2>팀 등록</h2>
             <form
@@ -318,7 +318,7 @@ export function SettingsPanel({
                 </div>
               ))}
           </section>
-          <section className="card settings-card">
+          <section className="card settings-card member-invite">
             <h2>
               <Mail size={20} />
               멤버 초대

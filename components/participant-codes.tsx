@@ -1,6 +1,6 @@
 "use client";
 import { useRef, useState } from "react";
-import { Copy, KeyRound, Mail } from "lucide-react";
+import { Copy, KeyRound, Mail, Trash2 } from "lucide-react";
 import {
   configured,
   invokeEdge,
@@ -13,9 +13,11 @@ import { useConfirm } from "./confirm";
 export function ParticipantCodes({
   data,
   refresh,
+  run,
 }: {
   data: Snapshot;
   refresh: () => Promise<void>;
+  run: (kind: string, payload: Record<string, unknown>) => Promise<void>;
 }) {
   const confirm = useConfirm(),
     [codes, setCodes] = useState<
@@ -31,6 +33,29 @@ export function ParticipantCodes({
   const recipients = registered.filter((i) =>
     ["pending", "failed", "sending"].includes(i.mail_status ?? "pending"),
   );
+  async function removeMember(invitation: Invitation) {
+    if (lock.current) return;
+    if (
+      !(await confirm(
+        `${invitation.display_name} (${invitation.email})님을 등록 명단에서 삭제하시겠습니까? 삭제 후 올바른 정보로 다시 등록할 수 있습니다.${invitation.role === "participant" && invitation.mail_status !== "pending" ? " 이미 전달한 팀 코드와 접속 권한은 유지됩니다. 잘못 전달된 코드는 해당 팀의 ‘코드 발급’으로 재발급해 주세요." : ""}`,
+      ))
+    )
+      return;
+    if (lock.current) return;
+    lock.current = true;
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      await run("registered_member_remove", { invitation_id: invitation.id });
+      setNotice("등록된 멤버를 삭제했습니다.");
+    } catch (e) {
+      setError(message(e));
+    } finally {
+      lock.current = false;
+      setBusy(false);
+    }
+  }
   async function sendAll() {
     if (lock.current || !recipients.length) return;
     if (
@@ -74,21 +99,35 @@ export function ParticipantCodes({
       i.mail_started_at &&
       Date.parse(i.mail_started_at) < Date.now() - 120000;
     return (
-      <span className="registered-member" key={i.id}>
-        <span>
-          <strong>{i.display_name}</strong> · {i.email} · {roleLabel[i.role]}
-        </span>
-        <span>
-          {
-            {
-              pending: "○ 발송 대기",
-              sending: "◷ 발송 중",
-              sent: "✓ 발송 완료",
-              failed: "! 발송 실패",
-              unknown: "? 수신 확인 필요",
-            }[status]
+      <div className="registered-member" key={i.id}>
+        <button
+          type="button"
+          className="registered-member-label"
+          disabled={busy || status === "sending"}
+          title={
+            status === "sending"
+              ? "메일 발송이 끝난 뒤 삭제할 수 있습니다"
+              : "등록된 멤버 삭제"
           }
-        </span>
+          onClick={() => void removeMember(i)}
+        >
+          <span className="registered-member-status">
+            {
+              {
+                pending: "○ 발송 대기",
+                sending: "◷ 발송 중",
+                sent: "✓ 발송 완료",
+                failed: "! 발송 실패",
+                unknown: "? 수신 확인 필요",
+              }[status]
+            }
+            <Trash2 size={13} aria-hidden="true" />
+          </span>
+          <span className="registered-member-identity">
+            <strong>{i.display_name}</strong>({i.email})
+          </span>
+          <span className="registered-member-role">{roleLabel[i.role]}</span>
+        </button>
         {i.mail_error && <small>{i.mail_error}</small>}
         {(status === "unknown" || stale) && (
           <button
@@ -120,7 +159,7 @@ export function ParticipantCodes({
             수신 확인 후 재발송 준비
           </button>
         )}
-      </span>
+      </div>
     );
   }
   async function issue(teamId: string) {
@@ -212,6 +251,7 @@ export function ParticipantCodes({
       <p className="help">
         멤버 초대에서 ‘멤버만 등록하기’를 누르면 수신자가 여기에 표시됩니다.
         운영자·심사위원은 팀 참여 코드 대신 해당 역할의 초대 링크를 받습니다.
+        등록 멤버 라벨을 누르면 삭제할 수 있습니다.
       </p>
       <button
         className="btn primary"

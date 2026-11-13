@@ -40,3 +40,14 @@ Google 이름을 받으려면 별도 Google OAuth 연동이 필요합니다. Goo
 - 실제 운영자 초대 메일 발송, 별도 계정 수락, Google 로그인 이름 수신, 모바일 실기기 검증은 이번 브라우저 확인에 포함하지 않았습니다. 초대 수락/권한 제거의 서버 동작은 자동 테스트로 검증했습니다.
 
 보안 진단의 기존 [SECURITY DEFINER 경고](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable)는 권한 검사를 수행하는 RPC 구조 때문에 남습니다. 실행 권한과 행사별 검증을 확인했습니다. [익명 로그인 정책 경고](https://supabase.com/docs/guides/database/database-advisors?queryGroups=lint&lint=0012_auth_allow_anonymous_sign_ins)는 참여 코드 로그인 지원, [정책 없음 INFO](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy)는 서버 전용 테이블의 직접 접근 차단입니다. [유출 비밀번호 보호](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection)는 기존 미설정 상태이며 이번 변경에서 인증 설정은 수정하지 않았습니다.
+
+## 등록 멤버 삭제와 라벨 — 2026-11-14 KST
+
+- 참여 코드 발급의 등록 멤버 라벨을 누르면 ‘삭제하시겠습니까?’ 모달이 열립니다. 취소/Escape는 명단을 유지합니다. 확인하면 등록 명단과 일괄 발송 대상에서 제거하며 같은 이메일로 올바른 정보를 다시 등록할 수 있습니다.
+- 라벨은 **발송 상태 → 이름(메일주소) → 역할** 순서로 표시합니다. 멤버 초대의 역할·소속 팀 드롭다운과 입력란 높이를 44px로 통일했습니다.
+- 삭제는 해당 행사 운영자만 가능하며, `registered_only=true`이고 아직 초대를 수락하지 않은 대상만 허용합니다. 발송 중 삭제는 UI와 DB 양쪽에서 차단합니다. 팀, 제출 자료, 기존 멤버십, 팀 참여 코드는 삭제하지 않습니다.
+- 참여자에게 이미 전달된 팀 코드는 등록 명단 삭제로 무효화되지 않습니다. 잘못 전달했다면 해당 팀 코드를 재발급해야 하며, 이미 접속한 계정의 권한도 별도 관리 대상입니다. 발송 이력이 있는 참여자는 삭제 확인에서 이 내용을 안내합니다.
+- 마이그레이션 `20261113155606_registered_member_removal.sql`: 사용자 승인 후 실제 Supabase에 적용했습니다. 원격 함수 반영과 anon 실행 차단·authenticated 실행 허용을 확인했습니다. 보안 진단은 위에 기록한 기존 경고 범주와 동일합니다. 기존 `app_command`의 초대 취소 분기에 등록 멤버 삭제를 추가하며 행사 잠금·역할 검사·중복 요청 처리를 재사용합니다.
+- 전용 PostgreSQL에서 **35개 테스트 통과, skip 없음**. 세 역할의 삭제·재등록, 권한/행사 격리, 수락된 초대 및 일반 링크 초대 제외, 발송 상태별 처리, 코드/멤버십 보존, 삭제와 메일 발송 선점의 동시성 검증을 포함합니다. 타입 검사와 프로덕션 빌드도 통과했습니다.
+- 실제 Safari에서 세 줄 표시, 입력 높이, 모달 표시와 취소를 확인했습니다. 기존 사용자의 등록 명단을 실제 삭제하거나 메일을 발송하지는 않았습니다.
+- [라벨·입력 높이](screenshots/registered-member-label.png), [삭제 확인 모달](screenshots/registered-member-confirm.png).
