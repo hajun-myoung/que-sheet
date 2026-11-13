@@ -94,22 +94,22 @@ export function AccessScreen({
           <span className="brand-mark">
             q<span>•</span>
           </span>
-          <strong>큐</strong>
+          <strong>큐:시트</strong>
         </a>
         <span className="eyebrow">YOUR NEXT PRESENTATION</span>
         <h1>
-          좋은 발표에
+          매끄러운 발표에
           <br />
           집중할 수 있도록.
         </h1>
         <p>
-          자료 제출부터 발표 연습, 현장 진행과 심사까지.
+          자료 제출부터 발표 연습, 현장 진행과 심사까지,
           <br />
-          당신의 역할에 맞는 공간에서 시작하세요.
+          큐:시트가 도와드립니다
         </p>
         <div className="access-steps">
           <span>01 자료 제출</span>
-          <span>02 발표와 연습</span>
+          <span>02 발표연습</span>
           <span>03 심사와 피드백</span>
         </div>
       </section>
