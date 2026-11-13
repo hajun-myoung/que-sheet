@@ -89,6 +89,10 @@ export type Invitation = {
   team_id: string | null;
   display_name: string;
   accepted: boolean;
+  registered_only?: boolean;
+  mail_status?: "pending" | "sending" | "sent" | "failed" | "unknown";
+  mail_started_at?: string | null;
+  mail_error?: string | null;
 };
 export type Assignment = {
   event_id: string;

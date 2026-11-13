@@ -19,6 +19,7 @@ export function AccessScreen({
   setEventId,
   loadError,
   logout,
+  recovery,
 }: {
   login: (role: Role, code?: string) => Promise<void>;
   refresh: () => Promise<void>;
@@ -27,6 +28,7 @@ export function AccessScreen({
   setEventId: (id: string) => void;
   loadError: string;
   logout: () => Promise<void>;
+  recovery?: React.ReactNode;
 }) {
   const signedIn = configured && Boolean(accountEmail);
   const [role, setRole] = useState<Role>(signedIn ? "operator" : "participant"),
@@ -41,8 +43,15 @@ export function AccessScreen({
     const params = new URLSearchParams(location.search);
     setInvite(params.get("invite") ?? "");
     const r = params.get("role");
+    const linkCode = new URLSearchParams(location.hash.slice(1)).get("code");
+    if (linkCode) {
+      setCode(linkCode.slice(0, 80));
+      setRole("participant");
+      history.replaceState(null, "", location.pathname + location.search);
+    }
     if (r === "operator" || r === "judge") setRole(r);
-    else if (accountEmail) setRole("operator");
+    else if (r === "participant") setRole("participant");
+    else if (accountEmail && !linkCode) setRole("operator");
     setNotice("");
   }, [accountEmail]);
   async function submit(action = "login") {
@@ -330,6 +339,7 @@ export function AccessScreen({
             {notice || loadError}
           </p>
         )}
+        {recovery}
         <p className="access-footer">
           {configured
             ? "운영자·심사위원의 실제 권한은 행사 배정에 따라 결정됩니다."

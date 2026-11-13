@@ -55,6 +55,7 @@ import { PdfEmpty, PdfViewer } from "./pdf-viewer";
 import { Presenter } from "./presenter";
 import { Upload } from "./upload";
 import { ReviewForm, Results } from "./reviews";
+import { EventActions, PendingDeletions } from "./event-actions";
 import { AccessScreen } from "./access-screen";
 import { ParticipantForm } from "./participant-form";
 import { Practice } from "./practice";
@@ -65,6 +66,7 @@ export function Workspace() {
   const store = useWorkspace(),
     { data, mutate } = store;
   const [view, setView] = useState("dashboard"),
+    [codeEntry, setCodeEntry] = useState(false),
     [selected, setSelected] = useState(""),
     [search, setSearch] = useState(""),
     [previewPage, setPreviewPage] = useState(1),
@@ -106,6 +108,7 @@ export function Workspace() {
   }, [dirty]);
   useEffect(() => {
     setInviteId(new URLSearchParams(location.search).get("invite") ?? "");
+    setCodeEntry(new URLSearchParams(location.hash.slice(1)).has("code"));
   }, []);
   useEffect(() => {
     if (!notice) return;
@@ -185,16 +188,28 @@ export function Workspace() {
         <p>접속 상태를 확인하고 있습니다…</p>
       </div>
     );
-  if (!data)
+  if (!data || codeEntry)
     return (
       <AccessScreen
-        login={store.login}
+        login={async (role, code) => {
+          await store.login(role, code);
+          setCodeEntry(false);
+        }}
         refresh={store.refresh}
         accountEmail={store.accountEmail}
         events={store.events}
-        setEventId={store.setEventId}
+        setEventId={(id) => {
+          store.setEventId(id);
+          setCodeEntry(false);
+        }}
         loadError={store.error}
         logout={store.logout}
+        recovery={
+          <PendingDeletions
+            events={store.pendingDeletions}
+            refresh={store.refresh}
+          />
+        }
       />
     );
   if (data.me.role === "participant" && team && !team.submission_id)
@@ -288,7 +303,9 @@ export function Workspace() {
           <div className="nav-user">
             <span className="avatar">{data.me.display_name[0]}</span>
             <div>
-              <strong>{data.me.display_name}</strong>
+              <strong title={data.me.display_name}>
+                {data.me.display_name}
+              </strong>
               <small>{roleLabel[data.me.role]}</small>
             </div>
             {
@@ -349,6 +366,13 @@ export function Workspace() {
                 </button>
               </div>
             )}
+            {configured && operator && (
+              <EventActions
+                data={data}
+                openEvent={store.setEventId}
+                refresh={store.refresh}
+              />
+            )}
             {configured && (
               <button
                 className="text-button"
@@ -385,6 +409,10 @@ export function Workspace() {
           </div>
         </header>
         <main className="main-content">
+          <PendingDeletions
+            events={store.pendingDeletions}
+            refresh={store.refresh}
+          />
           {configured && inviteId && (
             <div className="notice">
               <Mail size={18} />
@@ -898,7 +926,12 @@ export function Workspace() {
             />
           )}
           {view === "settings" && operator && (
-            <SettingsPanel key={data.event.id} data={data} run={run} />
+            <SettingsPanel
+              refresh={store.refresh}
+              key={data.event.id}
+              data={data}
+              run={run}
+            />
           )}
           {actionError && (
             <div className="action-error" role="alert">

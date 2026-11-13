@@ -383,6 +383,8 @@ export function reduce(
       check(["operator", "judge", "participant"].includes(String(p.role)));
       if (p.role === "participant") team();
       s.invitations.push({
+        registered_only: Boolean(p.registered_only),
+        mail_status: "pending",
         id: String(p.id),
         event_id: s.event.id,
         email: String(p.email),

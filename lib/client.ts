@@ -71,6 +71,9 @@ export function useWorkspace() {
     [eventId, setEventId] = useState(""),
     [authed, setAuthed] = useState(false),
     [accountEmail, setAccountEmail] = useState<string | null>(null),
+    [pendingDeletions, setPendingDeletions] = useState<
+      { id: string; name: string }[]
+    >([]),
     [authReady, setAuthReady] = useState(false),
     [connection, setConnection] = useState<"connecting" | "online" | "offline">(
       "connecting",
@@ -108,15 +111,27 @@ export function useWorkspace() {
             : null,
         );
         if (!session) {
+          setEvents([]);
+          setPendingDeletions([]);
           setData(null);
+          setError("");
           return;
         }
-        const list = await supabase.rpc("list_events");
+        const [list, cleanup] = await Promise.all([
+          supabase.rpc("list_events"),
+          supabase.rpc("pending_event_deletions"),
+        ]);
+        if (gen !== generation.current) return;
         if (list.error) throw list.error;
+        if (cleanup.error) throw cleanup.error;
+        setPendingDeletions(cleanup.data ?? []);
         setEvents(list.data ?? []);
-        const id = eventId || list.data?.[0]?.id;
+        const id = list.data?.some((e: { id: string }) => e.id === eventId)
+          ? eventId
+          : list.data?.[0]?.id;
         if (!id) {
           setData(null);
+          setError("");
           setConnection("online");
           return;
         }
@@ -260,6 +275,7 @@ export function useWorkspace() {
     setAuthed(false);
     setAccountEmail(null);
     setEvents([]);
+    setPendingDeletions([]);
     setEventId("");
   }
   return {
@@ -273,6 +289,7 @@ export function useWorkspace() {
     setEventId,
     authed,
     accountEmail,
+    pendingDeletions,
     connection,
     error,
     setError,
@@ -487,4 +504,28 @@ export async function issueParticipantCode(
     localStorage.setItem(STORE, JSON.stringify(data));
     return { code, expires_at };
   });
+}
+
+export async function invokeEdge<T>(
+  name: string,
+  body: Record<string, unknown>,
+): Promise<T> {
+  if (!supabase) throw Error("실제 Supabase 연결에서 사용할 수 있습니다.");
+  const { data, error } = await supabase.functions.invoke(name, { body });
+  if (error) {
+    let detail: string | undefined;
+    if (error.context instanceof Response) {
+      try {
+        detail = (await error.context.json()).error;
+      } catch {
+        /* Network / non-JSON response. */
+      }
+    }
+    throw Error(
+      detail ||
+        "서버에 연결하지 못했습니다. 상태를 확인하고 다시 시도해 주세요.",
+    );
+  }
+  if (data?.error && !data?.status) throw Error(data.error);
+  return data as T;
 }

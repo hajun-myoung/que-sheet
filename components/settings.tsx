@@ -27,8 +27,10 @@ import Footer from "./footer";
 export function SettingsPanel({
   data,
   run,
+  refresh,
 }: {
   data: Snapshot;
+  refresh: () => Promise<void>;
   run: (kind: string, payload: Record<string, unknown>) => Promise<void>;
 }) {
   const [tab, setTab] = useState("timer"),
@@ -220,7 +222,7 @@ export function SettingsPanel({
       )}
       {tab === "teams" && (
         <div className="settings-grid">
-          <ParticipantCodes data={data} />
+          <ParticipantCodes data={data} refresh={refresh} />
           <section className="card settings-card">
             <h2>팀 등록</h2>
             <form
@@ -310,8 +312,9 @@ export function SettingsPanel({
               멤버 초대
             </h2>
             <p className="help">
-              초대 링크를 복사해 전달하세요. 해당 이메일로 인증한 사용자만
-              참여할 수 있습니다.
+              초대 링크를 직접 전달하거나 멤버만 등록한 뒤 참여 코드 발급의 일괄
+              초대를 사용하세요. 등록만으로 계정이나 행사 권한이 생성되지는
+              않습니다.
             </p>
             <form
               onSubmit={(e) => {
@@ -321,6 +324,10 @@ export function SettingsPanel({
                   email,
                   display_name: inviteName,
                   role: inviteRole,
+                  registered_only:
+                    (e.nativeEvent as SubmitEvent).submitter?.getAttribute(
+                      "value",
+                    ) === "register",
                   ...(inviteRole === "participant"
                     ? { team_id: inviteTeam }
                     : {}),
@@ -376,10 +383,19 @@ export function SettingsPanel({
                   </select>
                 </label>
               )}
-              <button className="btn primary" disabled={saving}>
-                <Plus size={16} />
-                초대 링크 만들기
-              </button>
+              <div className="button-row">
+                <button className="btn primary" disabled={saving} value="link">
+                  <Plus size={16} />
+                  초대 링크 만들기
+                </button>
+                <button
+                  className="btn secondary"
+                  disabled={saving}
+                  value="register"
+                >
+                  멤버만 등록하기
+                </button>
+              </div>
             </form>
             <div className="invite-list">
               {data.invitations.map((i) => (
@@ -387,16 +403,23 @@ export function SettingsPanel({
                   <div>
                     <strong>{i.display_name}</strong>
                     <small>
-                      {i.email} · {i.accepted ? "참여 완료" : "초대 대기"}
+                      {i.email} ·{" "}
+                      {i.accepted
+                        ? "참여 완료"
+                        : i.registered_only
+                          ? "멤버 등록"
+                          : "초대 대기"}
                     </small>
                   </div>
-                  {!i.accepted && (
+                  {!i.accepted && !i.registered_only && (
                     <button
                       className="icon-btn"
                       aria-label={`${i.display_name} 초대 링크 복사`}
                       onClick={() => {
                         void navigator.clipboard
-                          .writeText(`${location.origin}/?invite=${i.id}`)
+                          .writeText(
+                            `${location.origin}/?role=${i.role}&invite=${i.id}`,
+                          )
                           .then(() => setNotice("초대 링크를 복사했습니다."))
                           .catch(() =>
                             setError(
