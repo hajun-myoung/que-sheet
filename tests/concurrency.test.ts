@@ -210,6 +210,69 @@ test(
         )
       ).rows[0];
       assert.equal(winner.name, winner.profile_name);
+      const invitation = crypto.randomUUID();
+      await command(a, "invite", {
+        id: invitation,
+        email: "race@example.com",
+        display_name: "등록 멤버",
+        role: "participant",
+        team_id: team,
+        registered_only: true,
+      });
+      const claims = await Promise.all([
+        a.query("select public.claim_invitation_email($1,$2,$3,$4) r", [
+          operator,
+          event,
+          invitation,
+          crypto.randomUUID(),
+        ]),
+        b.query("select public.claim_invitation_email($1,$2,$3,$4) r", [
+          operator,
+          event,
+          invitation,
+          crypto.randomUUID(),
+        ]),
+      ]);
+      assert.equal(
+        claims.filter((x) => x.rows[0].r.status === "claimed").length,
+        1,
+      );
+      assert.equal(
+        claims.filter((x) => x.rows[0].r.status === "sending").length,
+        1,
+      );
+      const mail = (
+        await admin.query(
+          "select mail_attempt from public.invitations where id=$1",
+          [invitation],
+        )
+      ).rows[0];
+      await admin.query(
+        "select public.finish_invitation_email($1,$2,'sent',null)",
+        [invitation, mail.mail_attempt],
+      );
+      const current = (
+        await admin.query("select version from public.sessions where id=$1", [
+          session.id,
+        ])
+      ).rows[0];
+      await command(a, "end", {
+        session_id: session.id,
+        version: current.version,
+      });
+      const deletes = await Promise.all([
+        a.query("select public.begin_event_deletion($1,$2,$3) r", [
+          operator,
+          event,
+          "동시성 검증",
+        ]),
+        b.query("select public.begin_event_deletion($1,$2,$3) r", [
+          operator,
+          event,
+          "동시성 검증",
+        ]),
+      ]);
+      assert.deepEqual(deletes[0].rows[0].r, deletes[1].rows[0].r);
     } finally {
       await Promise.all(clients.map((c) => c.end()));
       await admin.end();
