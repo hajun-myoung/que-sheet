@@ -18,6 +18,7 @@ import {
   type Team,
   type Command,
 } from "@/lib/model";
+import { formatResultScore, groupTeamResults } from "@/lib/results";
 import Footer from "./footer";
 export function ReviewForm({
   data,
@@ -273,6 +274,7 @@ export function Results({
 }) {
   const confirm = useConfirm();
   const submitted = data.evaluations.filter((e) => e.status === "submitted");
+  const groups = groupTeamResults(data);
   return (
     <div className="results">
       <div className="page-heading">
@@ -287,7 +289,7 @@ export function Results({
         </span>
       </div>
       <div className="card table-card">
-        <table>
+        <table className="team-results">
           <thead>
             <tr>
               <th>팀</th>
@@ -298,60 +300,129 @@ export function Results({
               <th>관리</th>
             </tr>
           </thead>
-          <tbody>
-            {data.assignments.map((a) => {
-              const t = data.teams.find((t) => t.id === a.team_id),
-                judge = data.members.find((m) => m.user_id === a.judge_id),
-                ev = data.evaluations.find(
-                  (e) => e.team_id === a.team_id && e.judge_id === a.judge_id,
-                ),
-                r = data.rubrics.find((r) => r.id === ev?.rubric_id);
-              return (
-                <tr key={`${a.team_id}-${a.judge_id}`}>
-                  <td>
-                    <strong>{t?.name}</strong>
-                  </td>
-                  <td>{judge?.display_name}</td>
-                  <td>{r ? `v${r.version}` : "—"}</td>
-                  <td>
-                    <span
-                      className={`badge ${ev?.status === "submitted" ? "success" : ev ? "amber" : ""}`}
-                    >
-                      {ev?.status === "submitted"
-                        ? "✓ 최종 제출"
-                        : ev
-                          ? "✎ 임시저장"
-                          : "◷ 미작성"}
-                    </span>
-                  </td>
-                  <td>
-                    {ev?.status === "submitted"
-                      ? `${Object.values(ev.scores).reduce((a, b) => a + b, 0)} / ${r?.items.reduce((a, i) => a + i.max, 0)}`
-                      : "—"}
-                  </td>
-                  <td>
-                    {ev?.status === "submitted" && (
-                      <button
-                        className="text-button"
-                        onClick={async () => {
-                          if (
-                            await confirm(
-                              "이 평가를 다시 작성할 수 있도록 열까요? 기존 점수와 기준 버전은 유지됩니다.",
-                            )
-                          )
-                            void run("reopen", { evaluation_id: ev.id });
-                        }}
+          {groups.map(({ team, reviews, submittedCount, averages }) => {
+            const multiple = reviews.length > 1;
+            const teamCell = (
+              <th
+                scope="rowgroup"
+                rowSpan={multiple ? reviews.length + 1 : 1}
+                className="team-result-name"
+              >
+                <strong>{team.name}</strong>
+              </th>
+            );
+            return (
+              <tbody key={team.id} aria-label={`${team.name} 심사 결과`}>
+                {!reviews.length && (
+                  <tr>
+                    {teamCell}
+                    <td colSpan={5}>
+                      <span className="badge">◷ 심사위원 미배정</span>
+                    </td>
+                  </tr>
+                )}
+                {multiple && (
+                  <tr className="team-average-row">
+                    {teamCell}
+                    <td>
+                      <strong>평균</strong>
+                      <small className="result-caption">
+                        심사위원 {reviews.length}명
+                      </small>
+                    </td>
+                    <td>
+                      {averages.length > 1
+                        ? "버전별"
+                        : averages.length === 1
+                          ? `v${averages[0].rubric.version}`
+                          : "—"}
+                    </td>
+                    <td>
+                      <span
+                        className={`badge ${submittedCount === reviews.length ? "success" : "amber"}`}
                       >
-                        재작성 허용
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
+                        {submittedCount === reviews.length ? "✓" : "◷"}{" "}
+                        {submittedCount}/{reviews.length}명 제출
+                      </span>
+                    </td>
+                    <td>
+                      {averages.length
+                        ? averages.map((a) => (
+                            <div className="average-version" key={a.rubric.id}>
+                              <strong>
+                                {formatResultScore(a.score)} /{" "}
+                                {formatResultScore(a.max)}
+                              </strong>
+                              <small className="result-caption">
+                                {a.count}명 평균
+                                {averages.length > 1
+                                  ? ` · 기준 v${a.rubric.version}`
+                                  : ""}
+                              </small>
+                            </div>
+                          ))
+                        : "—"}
+                    </td>
+                    <td>—</td>
+                  </tr>
+                )}
+                {reviews.map(
+                  ({ judgeId, judge, evaluation: ev, rubric: r }) => (
+                    <tr
+                      key={judgeId}
+                      className={multiple ? "team-review-row" : ""}
+                    >
+                      {!multiple && teamCell}
+                      <td>
+                        {multiple && (
+                          <span className="review-indent" aria-hidden="true">
+                            ↳
+                          </span>
+                        )}
+                        {judge?.display_name ?? "심사위원"}
+                      </td>
+                      <td>{r ? `v${r.version}` : "—"}</td>
+                      <td>
+                        <span
+                          className={`badge ${ev?.status === "submitted" ? "success" : ev ? "amber" : ""}`}
+                        >
+                          {ev?.status === "submitted"
+                            ? "✓ 최종 제출"
+                            : ev
+                              ? "✎ 임시저장"
+                              : "◷ 미작성"}
+                        </span>
+                      </td>
+                      <td>
+                        {ev?.status === "submitted" && r
+                          ? `${formatResultScore(Object.values(ev.scores).reduce((a, b) => a + b, 0))} / ${formatResultScore(r.items.reduce((a, i) => a + i.max, 0))}`
+                          : "—"}
+                      </td>
+                      <td>
+                        {ev?.status === "submitted" && (
+                          <button
+                            className="text-button"
+                            onClick={async () => {
+                              if (
+                                await confirm(
+                                  "이 평가를 다시 작성할 수 있도록 열까요? 기존 점수와 기준 버전은 유지됩니다.",
+                                )
+                              )
+                                void run("reopen", { evaluation_id: ev.id });
+                            }}
+                          >
+                            재작성 허용
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ),
+                )}
+              </tbody>
+            );
+          })}
         </table>
-        {!data.assignments.length && (
+        {!data.teams.length && (
           <div className="empty-state">
             설정에서 심사위원에게 팀을 배정해 주세요.
           </div>
@@ -392,8 +463,9 @@ export function Results({
         })}
       </div>
       <p className="help">
-        평가 기준 버전이 다른 결과는 단순 순위로 합산하지 않습니다. 각 결과에
-        적용된 기준과 배점을 함께 확인하세요.
+        평균은 현재 배정된 심사위원의 최종 제출 점수만 포함하며 소수점 둘째
+        자리까지 표시합니다. 미작성·임시저장 점수는 제외하고, 평가 기준 버전이
+        다르면 버전별 평균을 표시합니다.
       </p>
       <Footer />
     </div>

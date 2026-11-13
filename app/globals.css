@@ -1541,6 +1541,39 @@ button:not(:disabled):active {
 .table-card tr:last-child td {
   border-bottom: 0;
 }
+.team-results tbody + tbody {
+  border-top: 1px solid var(--line);
+}
+.team-results .team-result-name {
+  background: var(--card);
+  color: var(--ink);
+  font-size: 12px;
+  vertical-align: top;
+  padding-top: 19px;
+  border-right: 1px solid var(--line);
+  border-bottom: 0;
+}
+.team-results .team-average-row > td {
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+.team-results .team-review-row > td {
+  padding-top: 14px;
+  padding-bottom: 14px;
+}
+.result-caption {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.average-version + .average-version {
+  margin-top: 10px;
+}
+.review-indent {
+  color: var(--muted);
+  margin-right: 9px;
+}
 .feedback-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
