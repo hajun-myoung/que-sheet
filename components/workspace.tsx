@@ -55,6 +55,7 @@ import { PdfEmpty, PdfViewer } from "./pdf-viewer";
 import { Presenter } from "./presenter";
 import { Upload } from "./upload";
 import { ReviewForm, Results } from "./reviews";
+import { AccountPopover } from "./account-popover";
 import { EventActions, PendingDeletions } from "./event-actions";
 import { AccessScreen } from "./access-screen";
 import { ParticipantForm } from "./participant-form";
@@ -373,39 +374,17 @@ export function Workspace() {
                 refresh={store.refresh}
               />
             )}
-            {configured && (
-              <button
-                className="text-button"
-                onClick={() =>
-                  navigate(() => {
-                    void store.logout();
-                  })
-                }
-              >
-                로그아웃
-              </button>
-            )}
-            {configured && store.events.length > 1 && (
-              <select
-                aria-label="행사 선택"
-                value={data.event.id}
-                onChange={(e) =>
-                  navigate(() => {
-                    store.setEventId(e.target.value);
-                    setSelected("");
-                  })
-                }
-              >
-                {store.events.map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.name}
-                  </option>
-                ))}
-              </select>
-            )}
-            <span className="avatar small-avatar">
-              {data.me.display_name[0]}
-            </span>
+            <AccountPopover
+              key={data.event.id}
+              data={data}
+              email={store.accountEmail}
+              googleName={store.googleName}
+              events={store.events}
+              openEvent={store.setEventId}
+              refresh={store.refresh}
+              navigate={navigate}
+              logout={store.logout}
+            />
           </div>
         </header>
         <main className="main-content">
@@ -927,6 +906,7 @@ export function Workspace() {
           )}
           {view === "settings" && operator && (
             <SettingsPanel
+              openEvent={store.setEventId}
               refresh={store.refresh}
               key={data.event.id}
               data={data}

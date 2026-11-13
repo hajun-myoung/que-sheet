@@ -71,6 +71,7 @@ export function useWorkspace() {
     [eventId, setEventId] = useState(""),
     [authed, setAuthed] = useState(false),
     [accountEmail, setAccountEmail] = useState<string | null>(null),
+    [googleName, setGoogleName] = useState<string | null>(null),
     [pendingDeletions, setPendingDeletions] = useState<
       { id: string; name: string }[]
     >([]),
@@ -103,6 +104,14 @@ export function useWorkspace() {
           data: { session },
         } = await supabase.auth.getSession();
         setAuthed(Boolean(session));
+        // Display only: event permissions always come from DB membership.
+        const profile = session?.user.identities?.find(
+          (i) => i.provider === "google",
+        )?.identity_data;
+        const name = profile?.full_name ?? profile?.name;
+        setGoogleName(
+          typeof name === "string" && name.trim() ? name.trim() : null,
+        );
         setAccountEmail(
           session &&
             !session.user.is_anonymous &&
@@ -274,6 +283,7 @@ export function useWorkspace() {
     setData(null);
     setAuthed(false);
     setAccountEmail(null);
+    setGoogleName(null);
     setEvents([]);
     setPendingDeletions([]);
     setEventId("");
@@ -289,6 +299,7 @@ export function useWorkspace() {
     setEventId,
     authed,
     accountEmail,
+    googleName,
     pendingDeletions,
     connection,
     error,

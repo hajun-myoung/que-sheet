@@ -64,6 +64,7 @@ button:focus-visible,
 a:focus-visible,
 input:focus-visible,
 textarea:focus-visible,
+summary:focus-visible,
 select:focus-visible {
   outline: 3px solid var(--brand);
   outline-offset: 3px;
@@ -3150,4 +3151,220 @@ progress {
   align-items: center;
   gap: 6px;
   white-space: nowrap;
+}
+
+/* Account controls stay in the browser top layer, including narrow screens. */
+.account-trigger {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--line);
+  cursor: pointer;
+}
+.account-trigger:hover,
+.account-trigger[aria-expanded="true"] {
+  background: var(--brand-soft);
+  color: var(--brand);
+  border-color: var(--brand-border);
+}
+.account-popover {
+  position: fixed;
+  inset: 76px 24px auto auto;
+  margin: 0;
+  width: min(380px, calc(100vw - 24px));
+  max-height: calc(100dvh - 90px);
+  overflow-y: auto;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--bg);
+  color: var(--ink);
+  box-shadow: 0 16px 50px #25212624;
+}
+.account-popover-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--muted);
+  padding: 0 4px;
+}
+.account-identity {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 12px 24px;
+  text-align: center;
+}
+.account-avatar {
+  width: 64px;
+  height: 64px;
+  background: var(--brand-soft);
+  color: var(--brand);
+  border: 1px solid var(--brand-border);
+  margin-bottom: 4px;
+}
+.account-identity strong {
+  font-size: 20px;
+  overflow-wrap: anywhere;
+}
+.account-email {
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+.account-identity small {
+  color: var(--muted);
+}
+.account-events {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  overflow: hidden;
+}
+.account-events summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  padding: 18px 16px;
+}
+.account-events summary::-webkit-details-marker {
+  display: none;
+}
+.account-events summary:focus-visible {
+  outline-offset: -4px;
+}
+.account-events summary > span {
+  min-width: 0;
+  flex: 1;
+}
+.account-events summary small,
+.account-events summary strong {
+  display: block;
+}
+.account-events summary small {
+  color: var(--muted);
+  font-size: 11px;
+  margin-bottom: 3px;
+}
+.account-events summary strong {
+  overflow-wrap: anywhere;
+}
+.account-events summary > svg {
+  flex-shrink: 0;
+  color: var(--brand);
+}
+.account-events[open] .event-chevron {
+  transform: rotate(180deg);
+}
+.account-event-list {
+  padding: 6px;
+  border-top: 1px solid var(--line);
+  max-height: 230px;
+  overflow-y: auto;
+}
+.account-event-list button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  padding: 12px;
+  border-radius: 12px;
+  background: transparent;
+  border: 0;
+}
+.account-event-list button span {
+  overflow-wrap: anywhere;
+}
+.account-event-list button svg {
+  flex-shrink: 0;
+}
+.account-event-list button[aria-current="true"],
+.account-event-list button:hover {
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+.account-create {
+  margin-top: 12px;
+}
+.account-create > .btn {
+  width: 100%;
+  border-radius: 16px;
+  min-height: 46px;
+}
+.account-logout {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 14px;
+  margin-top: 12px;
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+}
+.account-logout:hover {
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+.general-settings {
+  display: grid;
+  gap: 24px;
+  max-width: 1000px;
+}
+.general-settings .settings-card > p {
+  margin-bottom: 20px;
+}
+.operator-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 24px;
+}
+.operator-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  background: var(--bg);
+  border-radius: 16px;
+  border: 1px solid var(--line);
+}
+.operator-row .field {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+.operator-row .button-row {
+  margin-top: 18px;
+}
+.danger-zone {
+  border-color: var(--brand-border);
+}
+.danger-zone h2 {
+  color: var(--brand);
+}
+@media (max-width: 700px) {
+  .account-popover {
+    top: 62px;
+    right: 12px;
+    max-height: calc(100dvh - 74px);
+  }
+  .operator-row {
+    flex-wrap: wrap;
+  }
+  .operator-row .button-row {
+    width: 100%;
+    justify-content: flex-end;
+    margin-top: 0;
+  }
+  .topbar .breadcrumbs {
+    display: none;
+  }
+  .topbar-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
 }

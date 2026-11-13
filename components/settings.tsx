@@ -1,4 +1,5 @@
 "use client";
+import { GeneralSettings } from "./general-settings";
 import { ParticipantCodes } from "./participant-codes";
 import { useState } from "react";
 import {
@@ -28,8 +29,10 @@ export function SettingsPanel({
   data,
   run,
   refresh,
+  openEvent,
 }: {
   data: Snapshot;
+  openEvent: (id: string) => void;
   refresh: () => Promise<void>;
   run: (kind: string, payload: Record<string, unknown>) => Promise<void>;
 }) {
@@ -86,6 +89,7 @@ export function SettingsPanel({
       </div>
       <div className="tabs" role="group" aria-label="설정 항목">
         {[
+          ["general", "일반 및 운영"],
           ["timer", "타이머"],
           ["teams", "팀 · 심사위원"],
           ["rubric", "평가 기준"],
@@ -104,6 +108,14 @@ export function SettingsPanel({
           </button>
         ))}
       </div>
+      {tab === "general" && (
+        <GeneralSettings
+          data={data}
+          run={run}
+          refresh={refresh}
+          openEvent={openEvent}
+        />
+      )}
       {tab === "timer" && (
         <div className="settings-grid">
           <section className="card settings-card">

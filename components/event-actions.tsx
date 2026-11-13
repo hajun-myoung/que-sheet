@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { invokeEdge, message, supabase } from "@/lib/client";
 import { activeSession, uuid, type Snapshot } from "@/lib/model";
@@ -8,11 +8,14 @@ export function EventActions({
   data,
   openEvent,
   refresh,
+  action = "create",
 }: {
   data: Snapshot;
   openEvent: (id: string) => void;
   refresh: () => Promise<void>;
+  action?: "create" | "delete";
 }) {
+  const titleId = useId();
   const [mode, setMode] = useState<"create" | "delete" | null>(null),
     [name, setName] = useState(""),
     [busy, setBusy] = useState(false),
@@ -59,26 +62,29 @@ export function EventActions({
   }
   return (
     <>
-      <button className="btn secondary" onClick={() => open("create")}>
-        <Plus size={16} />새 행사 만들기
-      </button>
-      <button
-        className="text-button event-delete-button"
-        onClick={() => open("delete")}
-      >
-        <Trash2 size={15} />
-        행사 삭제
-      </button>
+      {action === "create" ? (
+        <button className="btn secondary" onClick={() => open("create")}>
+          <Plus size={16} />새 행사 만들기
+        </button>
+      ) : (
+        <button
+          className="text-button event-delete-button"
+          onClick={() => open("delete")}
+        >
+          <Trash2 size={15} />
+          행사 삭제
+        </button>
+      )}
       <dialog
         ref={dialog}
         className="confirm-dialog"
-        aria-labelledby="event-action-title"
+        aria-labelledby={titleId}
         onCancel={(e) => {
           e.preventDefault();
           if (!busy) setMode(null);
         }}
       >
-        <h2 id="event-action-title">
+        <h2 id={titleId}>
           {mode === "create" ? "새 행사 만들기" : "행사 삭제"}
         </h2>
         <p>
