@@ -19,7 +19,9 @@
 - `participant_codes`, `code_attempts`의 정책 없음 INFO는 직접 접근을 차단하는 의도된 설정이다. [진단 설명](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy).
 - `events(id,current_rubric_id)` 인덱스 INFO는 id PK로 최대 한 행을 찾으므로 중복 인덱스를 추가하지 않았다. 새 인덱스의 unused INFO는 데이터가 없는 신규 설치 시점 결과다. [인덱스 진단](https://supabase.com/docs/guides/database/database-linter?lint=0001_unindexed_foreign_keys).
 
-인증 발송 확인 중: 기본 제공 메일 서버에서 `over_email_send_rate_limit`(429)을 확인했고 사용자 지정 Google Workspace SMTP로 전환했다. 이후 Gmail이 `535 5.7.8`을 반환하여, 사용자가 해당 계정의 앱 비밀번호를 재확인 중이다. 메일 수신·실제 운영자 행사 생성·인증된 PDF 업로드는 아직 완료 판정하지 않는다.
+인증 확인 완료: 기본 제공 메일 서버의 `over_email_send_rate_limit`(429) 때문에 Google Workspace SMTP로 전환했다. Gmail `535 5.7.8` 자격 증명 오류는 사용자가 SMTP 자격 증명을 재설정한 뒤 해결되었으며, 로그인 메일 수신을 확인했다. 실제 DB에서 이메일 인증 완료·로그인 기록과 `고려대학교 응용수리과학부 학술제` 행사, 해당 행사 운영자 1명을 확인했다. 행사 생성은 사용자가 앱에서 수행했다.
+
+남은 원격 통합 검증: 참여 코드로 팀 가입 → 인증된 PDF 업로드·미리보기 → 별도 기기의 Realtime 장표 이동·심사 제출. 확인 시점 실제 행사의 팀과 제출본은 각각 0개이므로 이 흐름까지 완료한 것으로 간주하지 않는다. 아래 이전 검증 기록의 미검증 항목 중 이메일 로그인·SMTP·행사 생성은 이번 확인으로 대체된다.
 
 ---
 
