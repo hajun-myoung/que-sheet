@@ -1,0 +1,7 @@
+{
+  "invite-user": "[큐:시트] 계정 초대가 도착했습니다",
+  "magic-link-or-otp": "[큐:시트] 로그인 링크가 도착했습니다",
+  "change-email-address": "[큐:시트] 이메일 주소 변경을 확인해 주세요",
+  "reset-password": "[큐:시트] 비밀번호 재설정을 안내합니다",
+  "reauthentication": "[큐:시트] 본인 확인 인증번호를 안내합니다"
+}
