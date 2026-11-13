@@ -1,3 +1,30 @@
+# 행사 관리·멤버 등록·일괄 초대 — 2026-11-13
+
+- 원격 마이그레이션 `20261113141221_event_lifecycle_and_invitations` 적용. `delete-event`, `send-invitations` Edge Function v1 배포.
+- PostgreSQL 18 임시 클러스터에서 **27개 전체 테스트 통과**, skip 없음. 수신자 동시 선점은 하나만 성공하고 중복 삭제는 같은 정리 기록을 반환한다. 등록 권한·멤버십 미생성·발송 상태·불확실한 결과 재시도·코드 보존·삭제 이름/역할/진행 중 발표 검증 포함.
+- `npm run typecheck`, `npm run build -- --webpack`, 두 신규 Edge Function의 `deno check` 통과.
+- 실제 HTTP에서 비로그인 `delete-event`, `send-invitations` 호출은 모두 401.
+- 실제 Safari + 실제 운영자 인증으로 새 행사 생성 → 새 행사 자동 선택 → 팀 등록 → 멤버만 등록 → 코드 카드 라벨 표시 → 일괄 초대 1명 → Gmail SMTP 접수 및 DB/화면 발송 완료 → 검증 행사 삭제 → 기존 행사로 복귀를 확인했다.
+- Chromium에서 초대 링크의 코드가 입력란에 반영되고 주소창 fragment는 제거되는 것을 확인했다. 기존 행사에 로그인 중이어도 코드 링크를 열면 코드 입력 화면으로 진입한다.
+- 좌하단 프로필 아이콘의 원형을 시각 확인했다. 긴 사용자명은 줄임표로 표시하고 title에 전체 이름을 제공한다.
+- [발송 결과 스크린샷](screenshots/member-invitation.png). 수신함 도착·메일 클라이언트별 HTML 렌더·모바일 실기기 링크 진입은 별도 확인 대상이다. 발송 완료는 SMTP 접수 의미다.
+
+## 요청한 테스트 데이터 초기화
+
+운영자 계정 2개와 기존 익명 참여 계정 1개, 기존 행사 2개 및 검증 행사, 관련 팀·평가·초대·발표 기록을 정리했다. 기존 PDF 1개는 Storage 대시보드의 삭제 기능으로 실물까지 삭제했다. 세션을 종료/폐기하고 Auth 계정을 삭제했으며, 정리 완료 기록과 코드 실패 기록도 초기화했다.
+
+최종 원격 조회: Auth users=0, events=0, members=0, teams=0, submissions=0, presentations objects=0. [빈 저장소 스크린샷](screenshots/storage-reset.png). Auth/SMTP 설정, 비공개 버킷, DB 스키마·RLS·Realtime 및 Edge 배포는 유지했다. 기존 이메일로 새 로그인 링크를 요청하면 신규 가입부터 테스트할 수 있다. 검증 메일의 기존 코드는 초기화로 무효화되었다.
+
+## 진단 및 한계
+
+- 신규 `event_deletions`는 RLS 활성화와 직접 접근 차단, 본인 삭제 재시도 목록만 RPC로 반환한다. 서버 삭제/메일 선점·완료 RPC는 service_role 전용이다.
+- [SECURITY DEFINER 진단](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable)의 신규 2개 공개 RPC는 본인 actor 조회 또는 행사 운영자 검사를 수행한다. [정책 없음 INFO](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy)는 비공개 서버 테이블의 의도된 거부 설정이다.
+- [익명 사용자 정책 경고](https://supabase.com/docs/guides/database/database-advisors?queryGroups=lint&lint=0012_auth_allow_anonymous_sign_ins)는 코드 로그인 참여자를 지원하기 위한 설정이다. 소속 팀/행사 검사는 그대로 적용된다. [유출 비밀번호 보호 경고](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection)는 현재 비밀번호 로그인을 제공하지 않아 이번 범위에서 설정하지 않았다.
+- 실제 원격에서 Storage 장애·SMTP 타임아웃을 강제로 발생시키지는 않았다. DB의 정리 재시도 및 발송 결과 불명 상태는 자동 테스트로 확인했다. SMTP의 정확히 한 번 도착은 보장하지 않으며, 불명확한 결과는 명시적 수신 확인 후 재시도한다.
+- `CUE_APP_URL`은 현재 localhost. 외부 기기용 발송 전 공개 HTTPS 앱 주소가 필요하다. [메일 설정·템플릿 수정 안내](INVITATION_EMAIL.md).
+
+---
+
 # 실제 Supabase 연결 — 2026-11-13
 
 프로젝트: `Academic Festival` (`nidalecwnnxlmxptibua`), PostgreSQL 17.11.

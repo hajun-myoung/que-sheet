@@ -141,3 +141,19 @@ CUE_TEST_DATABASE_URL=postgresql://USER@localhost:5432/cue_test_validation \
 기본 Supabase 메일 서버는 프로젝트 단위 시간당 2통으로 제한되고 프로젝트 팀에 등록된 이메일로만 발송합니다. Custom SMTP를 저장한 뒤 [Auth Rate Limits](https://supabase.com/dashboard/project/nidalecwnnxlmxptibua/auth/rate-limits)에서 이메일 발송 한도를 확인하세요. `email rate limit exceeded`가 계속되면 기존 2통 제한이 남아 있는지 확인합니다. [Supabase SMTP 문서](https://supabase.com/docs/guides/auth/auth-smtp).
 
 로컬 로그인용 [URL Configuration](https://supabase.com/dashboard/project/nidalecwnnxlmxptibua/auth/url-configuration)은 Site URL `http://localhost:3000`, Redirect URLs `http://localhost:3000/**`로 설정합니다. 실제 웹 호스팅 주소가 정해지면 HTTPS 주소를 추가하고 Site URL도 변경하세요.
+
+## 행사 생성·삭제와 멤버 일괄 초대
+
+운영 화면 상단에서 다른 행사를 만들거나 행사 이름을 확인하고 삭제할 수 있습니다. 진행 중 발표와 메일 발송 중 삭제는 서버에서 거절합니다. 삭제 후 Storage 정리가 실패하면 재시도 버튼이 표시됩니다. 계정 자체는 행사 삭제로 지워지지 않습니다.
+
+행사 설정 → 팀 · 심사위원 → **멤버만 등록하기**로 수신자를 저장한 뒤 참여 코드 발급 카드의 **일괄 초대하기**를 사용하세요. 수신자별 상태를 저장하므로 새로고침·다중 탭에서 중복 발송을 방지합니다. 팀 코드로 접속하는 참여자와 이메일 인증이 필요한 운영자·심사위원의 링크를 구분합니다.
+
+추가 마이그레이션: `20261113141221_event_lifecycle_and_invitations.sql`.
+
+```sh
+supabase db push
+supabase functions deploy delete-event --no-verify-jwt
+supabase functions deploy send-invitations --no-verify-jwt
+```
+
+두 함수는 내부에서 `auth.getUser()`와 행사 운영자 권한을 검증합니다. DB 삭제·발송 선점 RPC는 service_role 전용입니다. 메일용 SMTP 설정과 템플릿 편집·재배포 방법은 [초대 메일 안내](docs/INVITATION_EMAIL.md)를 참고하세요. 현재 `CUE_APP_URL`은 로컬 테스트 주소이며 외부 참여자에게 보내기 전에 공개 HTTPS 주소로 변경해야 합니다.
