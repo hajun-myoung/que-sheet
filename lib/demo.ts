@@ -1,5 +1,8 @@
+import { prepareSession, transitionSession } from "./presentation";
 import {
   activeSession,
+  validateTeamProfile,
+  type TeamProfile,
   defaults,
   validateScores,
   validateSettings,
@@ -127,8 +130,16 @@ export function seed(): Snapshot {
     server_time: new Date().toISOString(),
   };
 }
-export function visible(state: Snapshot, role: Role): Snapshot {
-  const me = state.members.find((x) => x.user_id === demoUsers[role])!;
+export function visible(
+  state: Snapshot,
+  role: Role,
+  participantTeam?: string,
+): Snapshot {
+  const original = state.members.find((x) => x.user_id === demoUsers[role])!;
+  const me =
+    role === "participant" && participantTeam
+      ? { ...original, team_id: participantTeam }
+      : original;
   const teams = state.teams.filter(
     (t) =>
       role === "operator" ||
@@ -164,10 +175,15 @@ export function reduce(
   cmd: Command,
   role: Role,
   now = Date.now(),
+  participantTeam?: string,
 ): Snapshot {
   const s = structuredClone(state),
     p = cmd.payload,
-    me = s.members.find((x) => x.user_id === demoUsers[role])!;
+    original = s.members.find((x) => x.user_id === demoUsers[role])!,
+    me =
+      role === "participant" && participantTeam
+        ? { ...original, team_id: participantTeam }
+        : original;
   const stamp = new Date(now).toISOString();
   check(cmd.event_id === s.event.id);
   const operator = () => check(role === "operator");
@@ -192,30 +208,7 @@ export function reduce(
       check(!activeSession(s), "이미 진행 중인 발표가 있습니다.");
       const pdf = s.submissions.find((x) => x.id === t.submission_id);
       check(pdf, "PDF 제출이 필요합니다.");
-      const settings = {
-        ...s.event.settings,
-        duration_seconds:
-          t.duration_seconds ?? s.event.settings.duration_seconds,
-      };
-      settings.warning_seconds = Math.min(
-        settings.warning_seconds,
-        settings.duration_seconds,
-      );
-      s.sessions.push({
-        id: String(p.id),
-        event_id: s.event.id,
-        team_id: t.id,
-        submission_id: pdf.id,
-        settings,
-        status: "preparing",
-        current_page: 1,
-        page_count: pdf.pages,
-        version: 1,
-        started_at: null,
-        paused_at: null,
-        paused_ms: 0,
-        ended_at: null,
-      });
+      s.sessions.push(prepareSession(t, pdf, s.event.settings, String(p.id)));
       break;
     }
     case "ready":
@@ -225,51 +218,13 @@ export function reduce(
     case "end":
     case "move": {
       const x = session();
-      if (cmd.kind === "move") {
+      if (cmd.kind === "move")
         check(
           role === "operator" ||
             (role === "participant" && me.team_id === x.team_id),
         );
-        check(
-          x.status === "running" || x.status === "paused",
-          "발표 준비 중에는 이동할 수 없습니다.",
-        );
-        const delta = Number(p.delta);
-        check(delta === 1 || delta === -1);
-        check(
-          x.current_page + delta >= 1 && x.current_page + delta <= x.page_count,
-          "첫 장 또는 마지막 장입니다.",
-        );
-        x.current_page += delta;
-      } else {
-        operator();
-        if (cmd.kind === "ready") {
-          check(x.status === "preparing");
-          x.status = "running";
-          x.started_at = stamp;
-        } else if (cmd.kind === "pause") {
-          check(x.status === "running");
-          x.status = "paused";
-          x.paused_at = stamp;
-        } else if (cmd.kind === "resume") {
-          check(x.status === "paused");
-          x.paused_ms += now - Date.parse(x.paused_at!);
-          x.paused_at = null;
-          x.status = "running";
-        } else if (cmd.kind === "reset") {
-          check(x.status === "running" || x.status === "paused");
-          x.started_at = stamp;
-          x.paused_ms = 0;
-          if (x.status === "paused") x.paused_at = stamp;
-        } else {
-          if (x.status === "paused")
-            x.paused_ms += now - Date.parse(x.paused_at!);
-          x.status = "ended";
-          x.ended_at = stamp;
-          x.paused_at = null;
-        }
-      }
-      x.version++;
+      else operator();
+      Object.assign(x, transitionSession(x, cmd.kind, p, now));
       break;
     }
     case "submission": {
@@ -283,6 +238,15 @@ export function reduce(
       );
       const sub = p.submission as Submission;
       check(sub.pages > 0 && sub.bytes <= 20 * 1024 * 1024);
+      if (role === "participant" && !t.submission_id && !p.profile)
+        throw Error("팀 정보와 PDF를 함께 제출해 주세요.");
+      if (p.profile) {
+        validateTeamProfile(p.profile as TeamProfile);
+        const profile = p.profile as TeamProfile;
+        t.name = profile.name.trim();
+        t.leader_name = profile.leader_name.trim();
+        t.member_names = profile.member_names.map((name) => name.trim());
+      }
       s.submissions.push(sub);
       t.submission_id = sub.id;
       break;

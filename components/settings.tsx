@@ -1,4 +1,5 @@
 "use client";
+import { ParticipantCodes } from "./participant-codes";
 import { useState } from "react";
 import {
   Check,
@@ -218,6 +219,7 @@ export function SettingsPanel({
       )}
       {tab === "teams" && (
         <div className="settings-grid">
+          <ParticipantCodes data={data} />
           <section className="card settings-card">
             <h2>팀 등록</h2>
             <form

@@ -9,6 +9,9 @@ import {
   type Role,
   type Submission,
   MAX_PDF_BYTES,
+  normalizeCode,
+  validateTeamProfile,
+  type TeamProfile,
 } from "./model";
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL,
   key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -17,11 +20,19 @@ export const supabase = configured ? createClient(url!, key!) : null;
 const STORE = "cue-demo-v1";
 type LocalStore = {
   state: Snapshot;
-  receipts: Record<string, { fingerprint: string; actor: Role }>;
+  receipts: Record<string, { fingerprint: string; actor: string }>;
+  accessCodes?: Record<string, { team_id: string; expires_at: string }>;
 };
 function readLocal(): LocalStore {
   const raw = localStorage.getItem(STORE);
-  return raw ? JSON.parse(raw) : { state: seed(), receipts: {} };
+  const data: LocalStore = raw
+    ? JSON.parse(raw)
+    : { state: seed(), receipts: {} };
+  data.accessCodes ??= {
+    CUE2026: { team_id: "team-5", expires_at: "2099-01-01" },
+    READY2026: { team_id: "team-1", expires_at: "2099-01-01" },
+  };
+  return data;
 }
 function announce() {
   const channel = new BroadcastChannel(STORE);
@@ -36,18 +47,19 @@ export function request(
 ): Command {
   return { kind, event_id, request_id: uuid(), payload };
 }
-async function localMutate(command: Command, role: Role) {
+async function localMutate(command: Command, role: Role, teamId?: string) {
+  const actor = role === "participant" ? `${role}:${teamId}` : role;
   await navigator.locks.request(STORE, async () => {
     const data = readLocal(),
       fingerprint = JSON.stringify(command),
       receipt = data.receipts[command.request_id];
     if (receipt) {
-      if (receipt.fingerprint !== fingerprint || receipt.actor !== role)
+      if (receipt.fingerprint !== fingerprint || receipt.actor !== actor)
         throw Error("동일한 요청 ID를 다른 내용에 사용할 수 없습니다.");
       return;
     }
-    data.state = reduce(data.state, command, role);
-    data.receipts[command.request_id] = { fingerprint, actor: role };
+    data.state = reduce(data.state, command, role, Date.now(), teamId);
+    data.receipts[command.request_id] = { fingerprint, actor };
     localStorage.setItem(STORE, JSON.stringify(data));
   });
   announce();
@@ -57,7 +69,8 @@ export function useWorkspace() {
     [role, setRole] = useState<Role>("operator"),
     [events, setEvents] = useState<{ id: string; name: string }[]>([]),
     [eventId, setEventId] = useState(""),
-    [authed, setAuthed] = useState(!configured),
+    [authed, setAuthed] = useState(false),
+    [authReady, setAuthReady] = useState(false),
     [connection, setConnection] = useState<"connecting" | "online" | "offline">(
       "connecting",
     ),
@@ -65,15 +78,22 @@ export function useWorkspace() {
     [offset, setOffset] = useState(0);
   const generation = useRef(0);
   const realtimeReady = useRef(!configured);
-  const roleRef = useRef(role);
-  roleRef.current = role;
+
   const refresh = useCallback(async () => {
     const gen = ++generation.current;
     let start = Date.now();
     try {
       let result: Snapshot;
       if (!supabase) {
-        result = visible(readLocal().state, roleRef.current);
+        const identity = readDemoAccess();
+        if (!identity) {
+          setAuthed(false);
+          setData(null);
+          return;
+        }
+        setAuthed(true);
+        setRole(identity.role);
+        result = visible(readLocal().state, identity.role, identity.team_id);
       } else {
         const {
           data: { session },
@@ -100,6 +120,7 @@ export function useWorkspace() {
       if (gen !== generation.current) return;
       setOffset(Date.parse(result.server_time) - (start + Date.now()) / 2);
       setData(result);
+      setRole(result.me.role);
       setConnection(realtimeReady.current ? "online" : "connecting");
       setError("");
     } catch (e) {
@@ -107,11 +128,13 @@ export function useWorkspace() {
         setConnection("offline");
         setError(message(e));
       }
+    } finally {
+      if (gen === generation.current) setAuthReady(true);
     }
   }, [eventId]);
   useEffect(() => {
     void refresh();
-  }, [refresh, role]);
+  }, [refresh]);
   useEffect(() => {
     let channel:
       ReturnType<NonNullable<typeof supabase>["channel"]> | undefined;
@@ -173,7 +196,11 @@ export function useWorkspace() {
             p: command.payload,
           });
           if (error) throw error;
-        } else await localMutate(command, roleRef.current);
+        } else {
+          const identity = readDemoAccess();
+          if (!identity) throw Error("로그인이 필요합니다.");
+          await localMutate(command, identity.role, identity.team_id);
+        }
         await refresh();
       } catch (e) {
         await refresh();
@@ -182,10 +209,55 @@ export function useWorkspace() {
     },
     [refresh],
   );
+  async function login(nextRole: Role, code = "") {
+    if (!supabase) {
+      let team_id: string | undefined;
+      if (nextRole === "participant") {
+        const entry = readLocal().accessCodes![normalizeCode(code)];
+        if (!entry || Date.parse(entry.expires_at) <= Date.now())
+          throw Error("코드가 올바르지 않거나 만료되었습니다.");
+        team_id = entry.team_id;
+      }
+      sessionStorage.setItem(
+        "cue-access",
+        JSON.stringify({ role: nextRole, team_id }),
+      );
+      await refresh();
+      return;
+    }
+    if (nextRole !== "participant") return;
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) {
+      const { error } = await supabase.auth.signInAnonymously();
+      if (error) throw error;
+    }
+    const { data: accepted, error } = await supabase.rpc(
+      "redeem_participant_code",
+      { p_code: code },
+    );
+    if (error) throw error;
+    if (accepted.error) throw Error(accepted.error);
+    setEventId(accepted.event_id);
+    await refresh();
+  }
+  async function logout() {
+    if (supabase) {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+    } else sessionStorage.removeItem("cue-access");
+    generation.current++;
+    setData(null);
+    setAuthed(false);
+    setEventId("");
+  }
   return {
     data,
     role,
-    setRole,
+    login,
+    logout,
+    authReady,
     events,
     eventId,
     setEventId,
@@ -295,7 +367,9 @@ export async function uploadPdf(
   mutate: (c: Command) => Promise<void>,
   requestId: string,
   createdAt: string,
+  profile?: TeamProfile,
 ) {
+  if (profile) validateTeamProfile(profile);
   const pages = await validatePdf(file);
   const team = s.teams.find((t) => t.id === teamId)!;
   if (!supabase) {
@@ -309,6 +383,7 @@ export async function uploadPdf(
       payload: {
         team_id: teamId,
         previous_id: team.submission_id,
+        ...(profile ? { profile } : {}),
         submission: {
           id: requestId,
           event_id: s.event.id,
@@ -359,6 +434,46 @@ export async function uploadPdf(
     body.set("team_id", teamId);
     body.set("previous_id", team.submission_id ?? "");
     body.set("request_id", requestId);
+    if (profile) body.set("profile", JSON.stringify(profile));
     xhr.send(body);
+  });
+}
+
+function readDemoAccess(): { role: Role; team_id?: string } | null {
+  const raw = sessionStorage.getItem("cue-access");
+  if (!raw) return null;
+  const value = JSON.parse(raw);
+  return ["operator", "participant", "judge"].includes(value.role)
+    ? value
+    : null;
+}
+export async function issueParticipantCode(
+  eventId: string,
+  teamId: string,
+): Promise<{ code: string; expires_at: string }> {
+  if (supabase) {
+    const { data, error } = await supabase.rpc("issue_participant_code", {
+      p_event: eventId,
+      p_team: teamId,
+    });
+    if (error) throw error;
+    return data;
+  }
+  return navigator.locks.request(STORE, () => {
+    if (readDemoAccess()?.role !== "operator")
+      throw Error("운영자만 코드를 발급할 수 있습니다.");
+    const data = readLocal();
+    if (
+      data.state.event.id !== eventId ||
+      !data.state.teams.some((t) => t.id === teamId)
+    )
+      throw Error("팀을 찾을 수 없습니다.");
+    const code = normalizeCode(uuid()),
+      expires_at = new Date(Date.now() + 7 * 86400000).toISOString();
+    for (const [key, value] of Object.entries(data.accessCodes!))
+      if (value.team_id === teamId) delete data.accessCodes![key];
+    data.accessCodes![code] = { team_id: teamId, expires_at };
+    localStorage.setItem(STORE, JSON.stringify(data));
+    return { code, expires_at };
   });
 }

@@ -55,6 +55,9 @@ import { PdfEmpty, PdfViewer } from "./pdf-viewer";
 import { Presenter } from "./presenter";
 import { Upload } from "./upload";
 import { ReviewForm, Results } from "./reviews";
+import { AccessScreen } from "./access-screen";
+import { ParticipantForm } from "./participant-form";
+import { Practice } from "./practice";
 import { SettingsPanel } from "./settings";
 export function Workspace() {
   const confirm = useConfirm();
@@ -65,6 +68,7 @@ export function Workspace() {
     [search, setSearch] = useState(""),
     [previewPage, setPreviewPage] = useState(1),
     [presenting, setPresenting] = useState(false),
+    [practicing, setPracticing] = useState(false),
     [busy, setBusy] = useState(false),
     [notice, setNotice] = useState(""),
     [actionError, setActionError] = useState(""),
@@ -76,6 +80,16 @@ export function Workspace() {
   const team = data?.teams.find((t) => t.id === selected) ?? data?.teams[0],
     session = data ? activeSession(data) : undefined,
     pdf = data?.submissions.find((s) => s.id === team?.submission_id);
+  useEffect(() => {
+    setView("dashboard");
+    setSelected("");
+    setSearch("");
+    setPresenting(false);
+    setPracticing(false);
+    setDirty(false);
+    setActionError("");
+    failed.current = null;
+  }, [data?.me.user_id, data?.me.role, data?.me.team_id, data?.event.id]);
   useEffect(() => {
     setPreviewPage(1);
   }, [team?.id, pdf?.id]);
@@ -91,12 +105,6 @@ export function Workspace() {
   }, [dirty]);
   useEffect(() => {
     setInviteId(new URLSearchParams(location.search).get("invite") ?? "");
-    const route = new URLSearchParams(location.search).get("role");
-    if (
-      !configured &&
-      ["operator", "participant", "judge"].includes(route ?? "")
-    )
-      store.setRole(route as Role);
   }, []);
   useEffect(() => {
     if (!notice) return;
@@ -169,31 +177,35 @@ export function Workspace() {
     openPresenter();
     await act("start", { team_id: team.id, id: uuid() });
   }
-  if (configured && !store.authed) return <Auth refresh={store.refresh} />;
-  if (!data)
-    return configured ? (
-      <Auth
-        refresh={store.refresh}
-        signedIn
-        events={store.events}
-        setEventId={store.setEventId}
-      />
-    ) : (
+  if (!store.authReady)
+    return (
       <div className="loading-screen">
         <div className="brand-mark">q</div>
-        <p>발표 공간을 준비하고 있습니다…</p>
-        {store.error && (
-          <div className="error">
-            {store.error}
-            <button
-              className="btn secondary"
-              onClick={() => void store.refresh()}
-            >
-              재시도
-            </button>
-          </div>
-        )}
+        <p>접속 상태를 확인하고 있습니다…</p>
       </div>
+    );
+  if (!data)
+    return (
+      <AccessScreen
+        login={store.login}
+        refresh={store.refresh}
+        signedIn={store.authed}
+        events={store.events}
+        setEventId={store.setEventId}
+        loadError={store.error}
+        logout={store.logout}
+      />
+    );
+  if (data.me.role === "participant" && team && !team.submission_id)
+    return (
+      <ParticipantForm
+        key={team.id}
+        data={data}
+        team={team}
+        mutate={mutate}
+        refresh={store.refresh}
+        logout={store.logout}
+      />
     );
   const operator = data.me.role === "operator",
     judge = data.me.role === "judge";
@@ -208,7 +220,7 @@ export function Workspace() {
     ).size;
   return (
     <div className="app-shell">
-      <aside className="app-nav" inert={presenting}>
+      <aside className="app-nav" inert={presenting || practicing}>
         <a className="brand" href="/" aria-label="큐 홈">
           <span className="brand-mark">
             q<span>•</span>
@@ -278,23 +290,23 @@ export function Workspace() {
               <strong>{data.me.display_name}</strong>
               <small>{roleLabel[data.me.role]}</small>
             </div>
-            {configured && (
+            {
               <button
                 aria-label="로그아웃"
                 className="icon-btn"
                 onClick={() =>
                   navigate(() => {
-                    void supabase?.auth.signOut();
+                    void store.logout();
                   })
                 }
               >
                 <LogOut size={16} />
               </button>
-            )}
+            }
           </div>
         </div>
       </aside>
-      <div className="main-shell" inert={presenting}>
+      <div className="main-shell" inert={presenting || practicing}>
         <header className="topbar">
           <div className="breadcrumbs">
             행사 관리 <ChevronRight size={13} />
@@ -322,24 +334,31 @@ export function Workspace() {
                 : "재연결 중"}
             </span>
             {!configured && (
-              <label className="demo-switch">
+              <div className="demo-switch">
                 <span>DEMO</span>
-                <select
-                  aria-label="데모 역할"
-                  value={store.role}
-                  onChange={(e) =>
+                <button
+                  className="text-button"
+                  onClick={() =>
                     navigate(() => {
-                      store.setRole(e.target.value as Role);
-                      setView("dashboard");
-                      setSelected("");
+                      void store.logout();
                     })
                   }
                 >
-                  <option value="operator">운영자 화면</option>
-                  <option value="participant">참여자 화면</option>
-                  <option value="judge">심사위원 화면</option>
-                </select>
-              </label>
+                  역할 전환 · 로그인
+                </button>
+              </div>
+            )}
+            {configured && (
+              <button
+                className="text-button"
+                onClick={() =>
+                  navigate(() => {
+                    void store.logout();
+                  })
+                }
+              >
+                로그아웃
+              </button>
             )}
             {configured && store.events.length > 1 && (
               <select
@@ -664,6 +683,13 @@ export function Workspace() {
                                 </p>
                               </div>
                             </div>
+                            {team.leader_name && (
+                              <p className="team-members">
+                                팀장 <strong>{team.leader_name}</strong> · 팀원{" "}
+                                {team.member_names?.join(", ") ||
+                                  "없음 (1인 팀)"}
+                              </p>
+                            )}
                             <div className="team-meta">
                               <span>
                                 <Users size={15} />
@@ -763,6 +789,13 @@ export function Workspace() {
                                 <Play size={17} fill="currentColor" />
                                 발표 시작
                               </button>
+                            )}
+                            {!operator && (
+                              <Practice
+                                data={data}
+                                team={team}
+                                onOpenChange={setPracticing}
+                              />
                             )}
                           </div>
                         </section>
@@ -979,164 +1012,5 @@ function Stat({
         )}
       </div>
     </div>
-  );
-}
-function Auth({
-  refresh,
-  signedIn = false,
-  events = [],
-  setEventId,
-}: {
-  refresh: () => Promise<void>;
-  signedIn?: boolean;
-  events?: { id: string; name: string }[];
-  setEventId?: (id: string) => void;
-}) {
-  const [email, setEmail] = useState(""),
-    [name, setName] = useState(""),
-    [invite, setInvite] = useState(""),
-    [notice, setNotice] = useState(""),
-    [busy, setBusy] = useState(false);
-  const createId = useRef(uuid());
-  useEffect(() => {
-    setInvite(new URLSearchParams(location.search).get("invite") ?? "");
-  }, []);
-  async function submit(action: string) {
-    setBusy(true);
-    setNotice("");
-    try {
-      if (action === "login") {
-        const { error } = await supabase!.auth.signInWithOtp({
-          email,
-          options: {
-            emailRedirectTo:
-              location.origin +
-              (invite ? `/?invite=${encodeURIComponent(invite)}` : ""),
-          },
-        });
-        if (error) throw error;
-        setNotice("로그인 링크를 이메일로 보냈습니다. 메일함을 확인해 주세요.");
-      } else if (action === "create") {
-        const { data, error } = await supabase!.rpc("create_event", {
-          p_name: name,
-          p_request: createId.current,
-        });
-        if (error) throw error;
-        setEventId?.(data);
-        await refresh();
-      } else {
-        const { data, error } = await supabase!.rpc("accept_invitation", {
-          p_id: invite,
-        });
-        if (error) throw error;
-        setEventId?.(data);
-        history.replaceState(null, "", "/");
-        await refresh();
-      }
-    } catch (e) {
-      setNotice(message(e));
-    } finally {
-      setBusy(false);
-    }
-  }
-  return (
-    <main className="auth-page">
-      <div className="auth-brand">
-        <span className="brand-mark">
-          q<span>•</span>
-        </span>
-        <span>발표가 흐르는 곳</span>
-      </div>
-      <section className="card auth-card">
-        <span className="eyebrow">WELCOME TO CUE</span>
-        <h1>{signedIn ? "행사를 준비해 볼까요?" : "좋은 발표의 시작, 큐"}</h1>
-        <p className="muted">자료 제출부터 현장 진행과 심사까지 한곳에서.</p>
-        {!signedIn ? (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              void submit("login");
-            }}
-          >
-            <label className="field">
-              이메일
-              <input
-                type="email"
-                required
-                placeholder="name@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </label>
-            <button className="btn primary" disabled={busy}>
-              <Mail size={17} />
-              이메일로 로그인
-            </button>
-            <p className="help">
-              초대받은 이메일을 사용해 주세요. 비밀번호 없이 안전한 로그인
-              링크를 보내드립니다.
-            </p>
-          </form>
-        ) : (
-          <>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                void submit("join");
-              }}
-            >
-              <label className="field">
-                초대 ID
-                <input
-                  required
-                  value={invite}
-                  onChange={(e) => setInvite(e.target.value)}
-                  placeholder="초대 링크의 ID"
-                />
-              </label>
-              <button className="btn primary" disabled={busy}>
-                초대 수락
-              </button>
-            </form>
-            <hr />
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                void submit("create");
-              }}
-            >
-              <label className="field">
-                새 행사 이름
-                <input
-                  required
-                  maxLength={100}
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="2026 데모데이"
-                />
-              </label>
-              <button className="btn secondary" disabled={busy}>
-                <Plus size={16} />
-                행사 만들기
-              </button>
-            </form>
-            {events.map((e) => (
-              <button
-                className="btn secondary"
-                key={e.id}
-                onClick={() => setEventId?.(e.id)}
-              >
-                {e.name} 열기
-              </button>
-            ))}
-          </>
-        )}
-        {notice && (
-          <p className="auth-notice" role="status">
-            {notice}
-          </p>
-        )}
-      </section>
-    </main>
   );
 }

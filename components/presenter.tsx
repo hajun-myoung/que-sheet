@@ -30,6 +30,7 @@ export function Presenter({
   connection,
   onClose,
   hostRef,
+  practice = false,
 }: {
   data: Snapshot;
   mutate: (c: Command) => Promise<void>;
@@ -37,6 +38,7 @@ export function Presenter({
   connection: string;
   onClose: () => void;
   hostRef: React.RefObject<HTMLDivElement | null>;
+  practice?: boolean;
 }) {
   const confirm = useConfirm();
   const s = activeSession(data),
@@ -125,9 +127,9 @@ export function Presenter({
   if (!s)
     return (
       <div className="presenter-ended">
-        <h2>발표가 종료되었습니다</h2>
+        <h2>{practice ? "연습이 종료되었습니다" : "발표가 종료되었습니다"}</h2>
         <button className="btn primary" onClick={onClose}>
-          운영 화면으로 돌아가기
+          {practice ? "내 팀 화면으로 돌아가기" : "운영 화면으로 돌아가기"}
         </button>
       </div>
     );
@@ -140,13 +142,15 @@ export function Presenter({
         <button
           className="icon-btn"
           onClick={onClose}
-          aria-label="운영 화면으로 돌아가기"
+          aria-label={
+            practice ? "내 팀 화면으로 돌아가기" : "운영 화면으로 돌아가기"
+          }
         >
           <ArrowLeft size={20} />
         </button>
         <span>
           {team?.name}
-          <small>발표 화면</small>
+          <small>{practice ? "발표 연습 · 나에게만 표시" : "발표 화면"}</small>
         </span>
         <div className="grow" />
         {connection !== "online" && (
@@ -241,12 +245,18 @@ export function Presenter({
             className="btn end"
             disabled={busy}
             onClick={async () => {
-              if (await confirm("현재 발표를 종료할까요?"))
+              if (
+                await confirm(
+                  practice
+                    ? "발표 연습을 종료할까요?"
+                    : "현재 발표를 종료할까요?",
+                )
+              )
                 void action("end", { session_id: s.id, version: s.version });
             }}
           >
             <Square size={14} />
-            발표 종료
+            {practice ? "연습 종료" : "발표 종료"}
           </button>
         </div>
       </div>

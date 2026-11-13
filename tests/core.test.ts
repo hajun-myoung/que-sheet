@@ -249,3 +249,58 @@ test("USB keyboard aliases and text-entry exclusion", () => {
     0,
   );
 });
+
+test("first participant submission requires a profile and affects only its code-selected team", () => {
+  const state = seed(),
+    team = state.teams.find((t) => t.id === "team-5")!;
+  const payload = {
+    team_id: team.id,
+    previous_id: null,
+    submission: {
+      ...state.submissions[0],
+      id: "survey-file",
+      team_id: team.id,
+    },
+  };
+  assert.throws(
+    () =>
+      reduce(
+        state,
+        command(state, "submission", payload),
+        "participant",
+        100000,
+        team.id,
+      ),
+    /팀/,
+  );
+  const submitted = reduce(
+    state,
+    command(state, "submission", {
+      ...payload,
+      profile: {
+        name: "새 팀명",
+        leader_name: "리더",
+        member_names: ["멤버"],
+        id: "forged",
+      },
+    }),
+    "participant",
+    100000,
+    team.id,
+  );
+  const own = visible(submitted, "participant", team.id);
+  assert.equal(own.teams.length, 1);
+  assert.equal(own.teams[0].id, team.id);
+  assert.equal(own.teams[0].name, "새 팀명");
+  assert.equal(own.teams[0].submission_id, "survey-file");
+  assert.equal(state.teams.find((t) => t.id === team.id)!.submission_id, null);
+  assert.throws(() =>
+    reduce(
+      state,
+      command(state, "submission", { ...payload, team_id: "team-2" }),
+      "participant",
+      100000,
+      team.id,
+    ),
+  );
+});
