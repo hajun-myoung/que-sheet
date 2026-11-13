@@ -202,6 +202,62 @@ export function reduce(
     return x;
   };
   switch (cmd.kind) {
+    case "event_rename": {
+      operator();
+      check(
+        typeof p.name === "string" &&
+          p.name.trim().length >= 1 &&
+          p.name.trim().length <= 100,
+        "행사 이름은 1~100자로 입력해 주세요.",
+      );
+      check(
+        s.event.name === p.expected_name,
+        "다른 운영자가 행사 이름을 변경했습니다. 최신 이름을 확인해 주세요.",
+      );
+      s.event.name = p.name.trim();
+      break;
+    }
+    case "operator_update":
+    case "operator_remove": {
+      operator();
+      const member = s.members.find(
+        (m) => m.user_id === p.user_id && m.role === "operator",
+      );
+      check(member, "이 행사의 운영자가 아닙니다.");
+      if (cmd.kind === "operator_update") {
+        check(
+          typeof p.display_name === "string" &&
+            p.display_name.trim().length >= 1 &&
+            p.display_name.trim().length <= 80,
+          "표시 이름은 1~80자로 입력해 주세요.",
+        );
+        check(
+          member.display_name === p.expected_name,
+          "다른 운영자가 이름을 수정했습니다. 최신 내용을 확인해 주세요.",
+        );
+        member.display_name = p.display_name.trim();
+      } else {
+        check(
+          s.members.filter((m) => m.role === "operator").length > 1,
+          "마지막 운영자는 제거할 수 없습니다.",
+        );
+        s.members = s.members.filter((m) => m !== member);
+      }
+      break;
+    }
+    case "operator_invitation_cancel": {
+      operator();
+      const inv = s.invitations.find(
+        (i) => i.id === p.invitation_id && i.role === "operator" && !i.accepted,
+      );
+      check(inv, "대기 중인 운영자 초대가 없습니다.");
+      check(
+        inv.mail_status !== "sending",
+        "메일 발송이 끝난 뒤 초대를 취소해 주세요.",
+      );
+      s.invitations = s.invitations.filter((i) => i !== inv);
+      break;
+    }
     case "start": {
       operator();
       const t = team();

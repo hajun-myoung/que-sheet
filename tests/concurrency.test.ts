@@ -260,6 +260,75 @@ test(
         session_id: session.id,
         version: current.version,
       });
+      // Two operators removing themselves concurrently must leave one operator.
+      const adminEvent = crypto.randomUUID(),
+        secondOp = crypto.randomUUID();
+      await admin.query("insert into auth.users(id) values($1)", [secondOp]);
+      await a.query("select public.create_event('운영자 동시성',$1)", [
+        adminEvent,
+      ]);
+      await admin.query(
+        "insert into public.members values($1,$2,'operator',null,'공동 운영자')",
+        [adminEvent, secondOp],
+      );
+      const c = await actor(secondOp);
+      const removals = await Promise.allSettled([
+        a.query(
+          "select public.app_command($1,$2,'operator_remove',$3::jsonb)",
+          [
+            adminEvent,
+            crypto.randomUUID(),
+            JSON.stringify({ user_id: operator }),
+          ],
+        ),
+        c.query(
+          "select public.app_command($1,$2,'operator_remove',$3::jsonb)",
+          [
+            adminEvent,
+            crypto.randomUUID(),
+            JSON.stringify({ user_id: secondOp }),
+          ],
+        ),
+      ]);
+      assert.equal(removals.filter((x) => x.status === "fulfilled").length, 1);
+      assert.equal(
+        (
+          await admin.query(
+            "select count(*)::int n from public.members where event_id=$1 and role='operator'",
+            [adminEvent],
+          )
+        ).rows[0].n,
+        1,
+      );
+      // Acceptance and cancellation serialize on the same event lock.
+      const invitee = crypto.randomUUID(),
+        raceInvite = crypto.randomUUID();
+      await admin.query("insert into auth.users(id) values($1)", [invitee]);
+      await command(a, "invite", {
+        id: raceInvite,
+        role: "operator",
+        display_name: "경합 초대",
+        email: "admin-acceptance-race@example.com",
+      });
+      const d = await actor(invitee);
+      await d.query("select set_config('request.jwt.claims',$1,false)", [
+        JSON.stringify({ email: "admin-acceptance-race@example.com" }),
+      ]);
+      const acceptance = await Promise.allSettled([
+        command(a, "operator_invitation_cancel", { invitation_id: raceInvite }),
+        d.query("select public.accept_invitation($1)", [raceInvite]),
+      ]);
+      assert.equal(
+        acceptance.filter((x) => x.status === "fulfilled").length,
+        1,
+      );
+      const accepted = (
+        await admin.query(
+          "select count(*)::int n from public.members where event_id=$1 and user_id=$2",
+          [event, invitee],
+        )
+      ).rows[0].n;
+      assert.equal(accepted, acceptance[1].status === "fulfilled" ? 1 : 0);
       const deletes = await Promise.all([
         a.query("select public.begin_event_deletion($1,$2,$3) r", [
           operator,
