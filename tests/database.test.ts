@@ -1,7 +1,6 @@
 import { before, after, test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { bootstrapSql } from "./fixtures";
+import { bootstrapSql, migrationSql } from "./fixtures";
 import { PGlite } from "@electric-sql/pglite";
 let db: PGlite;
 const uid = (i: number) =>
@@ -44,15 +43,7 @@ async function snapshot() {
 before(async () => {
   db = new PGlite();
   await db.exec(bootstrapSql);
-  await db.exec(
-    readFileSync("supabase/migrations/202611120001_core.sql", "utf8"),
-  );
-  await db.exec(
-    readFileSync(
-      "supabase/migrations/202611130001_participant_access.sql",
-      "utf8",
-    ),
-  );
+  await db.exec(migrationSql);
   await db.query("insert into auth.users(id) select unnest($1::uuid[])", [
     [op, participant, judge, outsider, otherParticipant],
   ]);

@@ -1,8 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { Client } from "pg";
-import { bootstrapSql } from "./fixtures";
+import { bootstrapSql, migrationSql } from "./fixtures";
 // Use an empty disposable database named cue_test_* only.
 const connectionString = process.env.CUE_TEST_DATABASE_URL;
 test(
@@ -21,15 +20,7 @@ test(
     try {
       // Roles are cluster-level; the disposable local cluster already has no application roles.
       await admin.query(bootstrapSql);
-      await admin.query(
-        readFileSync("supabase/migrations/202611120001_core.sql", "utf8"),
-      );
-      await admin.query(
-        readFileSync(
-          "supabase/migrations/202611130001_participant_access.sql",
-          "utf8",
-        ),
-      );
+      await admin.query(migrationSql);
       const operator = crypto.randomUUID(),
         judge = crypto.randomUUID(),
         event = crypto.randomUUID(),
