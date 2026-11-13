@@ -190,7 +190,7 @@ export function Workspace() {
       <AccessScreen
         login={store.login}
         refresh={store.refresh}
-        signedIn={store.authed}
+        accountEmail={store.accountEmail}
         events={store.events}
         setEventId={store.setEventId}
         loadError={store.error}

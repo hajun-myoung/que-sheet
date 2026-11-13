@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
+  CheckCircle2,
   ClipboardCheck,
   KeyRound,
   Mail,
@@ -13,7 +14,7 @@ import { roleLabel, uuid, type Role } from "@/lib/model";
 export function AccessScreen({
   login,
   refresh,
-  signedIn,
+  accountEmail,
   events,
   setEventId,
   loadError,
@@ -21,13 +22,14 @@ export function AccessScreen({
 }: {
   login: (role: Role, code?: string) => Promise<void>;
   refresh: () => Promise<void>;
-  signedIn: boolean;
+  accountEmail: string | null;
   events: { id: string; name: string }[];
   setEventId: (id: string) => void;
   loadError: string;
   logout: () => Promise<void>;
 }) {
-  const [role, setRole] = useState<Role>("participant"),
+  const signedIn = configured && Boolean(accountEmail);
+  const [role, setRole] = useState<Role>(signedIn ? "operator" : "participant"),
     [code, setCode] = useState(""),
     [email, setEmail] = useState(""),
     [name, setName] = useState(""),
@@ -40,7 +42,9 @@ export function AccessScreen({
     setInvite(params.get("invite") ?? "");
     const r = params.get("role");
     if (r === "operator" || r === "judge") setRole(r);
-  }, []);
+    else if (accountEmail) setRole("operator");
+    setNotice("");
+  }, [accountEmail]);
   async function submit(action = "login") {
     setBusy(true);
     setNotice("");
@@ -114,10 +118,26 @@ export function AccessScreen({
         </div>
       </section>
       <section className="card access-card">
-        <span className="eyebrow">WELCOME TO CUE</span>
-        <h2>어떤 역할로 참여하시나요?</h2>
-        <p className="muted">역할을 선택하고 나의 공간으로 접속하세요.</p>
-        <div className="role-picker" role="group" aria-label="로그인 역할">
+        <span className="eyebrow">
+          {signedIn ? "READY TO BEGIN" : "WELCOME TO CUE"}
+        </span>
+        <h2>{signedIn ? "로그인 완료" : "어떤 역할로 참여하시나요?"}</h2>
+        <p className="muted">
+          {signedIn
+            ? "참여할 행사를 선택하거나 새 행사를 만들어 주세요."
+            : "역할을 선택하고 나의 공간으로 접속하세요."}
+        </p>
+        {signedIn && (
+          <p className="auth-notice" role="status">
+            <CheckCircle2 size={17} aria-hidden="true" /> {accountEmail}{" "}
+            계정으로 로그인했습니다.
+          </p>
+        )}
+        <div
+          className="role-picker"
+          role="group"
+          aria-label={signedIn ? "이어서 할 작업" : "로그인 역할"}
+        >
           {(
             [
               ["participant", Users, "자료 제출 · 발표 연습"],
@@ -150,81 +170,101 @@ export function AccessScreen({
             </span>
           </div>
         )}
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            void submit();
-          }}
-        >
-          {role === "participant" ? (
-            <>
+        {(!signedIn || role === "participant") && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void submit();
+            }}
+          >
+            {role === "participant" ? (
+              <>
+                <label className="field">
+                  참여 코드
+                  <input
+                    required
+                    autoComplete="off"
+                    spellCheck={false}
+                    autoCapitalize="characters"
+                    maxLength={80}
+                    placeholder="운영자에게 받은 코드를 입력하세요"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                  />
+                </label>
+                <p className="help">
+                  첫 접속 후 팀 정보와 PDF를 제출합니다. 제출한 팀은 같은 코드로
+                  다시 접속할 수 있습니다.
+                </p>
+                {!configured && (
+                  <p className="demo-code-hint">
+                    첫 제출 체험:{" "}
+                    <button type="button" onClick={() => setCode("CUE2026")}>
+                      CUE2026
+                    </button>{" "}
+                    · 제출 완료 팀:{" "}
+                    <button type="button" onClick={() => setCode("READY2026")}>
+                      READY2026
+                    </button>
+                  </p>
+                )}
+              </>
+            ) : configured ? (
               <label className="field">
-                참여 코드
+                {roleLabel[role]} 이메일
                 <input
+                  type="email"
                   required
-                  autoComplete="off"
-                  spellCheck={false}
-                  autoCapitalize="characters"
-                  maxLength={80}
-                  placeholder="운영자에게 받은 코드를 입력하세요"
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
+                  value={email}
+                  placeholder="name@example.com"
+                  onChange={(e) => setEmail(e.target.value)}
                 />
               </label>
-              <p className="help">
-                첫 접속 후 팀 정보와 PDF를 제출합니다. 제출한 팀은 같은 코드로
-                다시 접속할 수 있습니다.
-              </p>
-              {!configured && (
-                <p className="demo-code-hint">
-                  첫 제출 체험:{" "}
-                  <button type="button" onClick={() => setCode("CUE2026")}>
-                    CUE2026
-                  </button>{" "}
-                  · 제출 완료 팀:{" "}
-                  <button type="button" onClick={() => setCode("READY2026")}>
-                    READY2026
-                  </button>
-                </p>
-              )}
-            </>
-          ) : configured ? (
-            <label className="field">
-              {roleLabel[role]} 이메일
-              <input
-                type="email"
-                required
-                value={email}
-                placeholder="name@example.com"
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </label>
-          ) : (
-            <p className="help">
-              {role === "operator"
-                ? "팀을 등록하고 참여 코드를 발급하거나 발표를 진행합니다."
-                : "배정된 팀의 점수와 비고를 입력하고 평가를 제출합니다."}
-            </p>
-          )}
-          <button className="btn primary access-submit" disabled={busy}>
-            {role === "participant" ? (
-              <KeyRound size={17} />
-            ) : configured ? (
-              <Mail size={17} />
             ) : (
-              <ArrowRight size={17} />
-            )}{" "}
-            {busy
-              ? "확인 중…"
-              : role === "participant"
-                ? "코드로 접속하기"
-                : configured
-                  ? "이메일로 로그인"
-                  : `${roleLabel[role]}${role === "judge" ? "으로" : "로"} 체험하기`}
-          </button>
-        </form>
-        {configured && signedIn && role !== "participant" && (
+              <p className="help">
+                {role === "operator"
+                  ? "팀을 등록하고 참여 코드를 발급하거나 발표를 진행합니다."
+                  : "배정된 팀의 점수와 비고를 입력하고 평가를 제출합니다."}
+              </p>
+            )}
+            <button className="btn primary access-submit" disabled={busy}>
+              {role === "participant" ? (
+                <KeyRound size={17} />
+              ) : configured ? (
+                <Mail size={17} />
+              ) : (
+                <ArrowRight size={17} />
+              )}{" "}
+              {busy
+                ? "확인 중…"
+                : role === "participant"
+                  ? "코드로 접속하기"
+                  : configured
+                    ? "이메일로 로그인"
+                    : `${roleLabel[role]}${role === "judge" ? "으로" : "로"} 체험하기`}
+            </button>
+          </form>
+        )}
+        {signedIn && role !== "participant" && (
           <div className="access-onboarding">
+            {events.length > 0 ? (
+              events.map((e) => (
+                <button
+                  key={e.id}
+                  className="btn secondary"
+                  disabled={busy}
+                  onClick={() => setEventId(e.id)}
+                >
+                  {e.name} 열기 <ArrowRight size={17} aria-hidden="true" />
+                </button>
+              ))
+            ) : (
+              <p className="help">
+                {role === "operator"
+                  ? "아직 참여 중인 행사가 없습니다. 새 행사를 만들거나 운영자 초대를 수락하세요."
+                  : "아직 배정된 행사가 없습니다. 운영자에게 받은 초대 ID로 참여하세요."}
+              </p>
+            )}
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -259,24 +299,31 @@ export function AccessScreen({
                     onChange={(e) => setName(e.target.value)}
                   />
                 </label>
-                <button className="btn secondary" disabled={busy}>
+                <button className="btn primary" disabled={busy}>
                   행사 만들기
                 </button>
               </form>
             )}
-            {events.map((e) => (
-              <button
-                key={e.id}
-                className="text-button"
-                onClick={() => setEventId(e.id)}
-              >
-                {e.name} 열기
-              </button>
-            ))}
-            <button className="text-button" onClick={() => void logout()}>
-              다른 계정으로 로그인
-            </button>
           </div>
+        )}
+        {signedIn && (
+          <button
+            className="text-button"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              setNotice("");
+              try {
+                await logout();
+              } catch (e) {
+                setNotice(message(e));
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            로그아웃 · 다른 계정 사용
+          </button>
         )}
         {(notice || loadError) && (
           <p className="auth-notice" role="status">

@@ -70,6 +70,7 @@ export function useWorkspace() {
     [events, setEvents] = useState<{ id: string; name: string }[]>([]),
     [eventId, setEventId] = useState(""),
     [authed, setAuthed] = useState(false),
+    [accountEmail, setAccountEmail] = useState<string | null>(null),
     [authReady, setAuthReady] = useState(false),
     [connection, setConnection] = useState<"connecting" | "online" | "offline">(
       "connecting",
@@ -99,6 +100,13 @@ export function useWorkspace() {
           data: { session },
         } = await supabase.auth.getSession();
         setAuthed(Boolean(session));
+        setAccountEmail(
+          session &&
+            !session.user.is_anonymous &&
+            session.user.email_confirmed_at
+            ? (session.user.email ?? null)
+            : null,
+        );
         if (!session) {
           setData(null);
           return;
@@ -250,6 +258,8 @@ export function useWorkspace() {
     generation.current++;
     setData(null);
     setAuthed(false);
+    setAccountEmail(null);
+    setEvents([]);
     setEventId("");
   }
   return {
@@ -262,6 +272,7 @@ export function useWorkspace() {
     eventId,
     setEventId,
     authed,
+    accountEmail,
     connection,
     error,
     setError,
