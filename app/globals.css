@@ -3439,3 +3439,297 @@ progress {
     justify-content: flex-end;
   }
 }
+
+/* Help controls, local test access and document viewer. */
+.access-help {
+  position: absolute;
+  top: 22px;
+  right: 28px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.help-trigger {
+  border: 1px solid var(--line);
+  color: var(--muted);
+  background: var(--card);
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.help-trigger:hover {
+  color: var(--brand);
+  border-color: var(--brand);
+}
+.help-language {
+  display: inline-flex;
+  gap: 3px;
+  flex-shrink: 0;
+}
+.help-language button {
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  padding: 4px 7px;
+  font-size: 11px;
+}
+.help-language button[aria-pressed="true"] {
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-weight: 700;
+}
+.test-access {
+  margin-top: 26px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+}
+.test-access-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.test-access h2 {
+  font-size: 16px;
+}
+.test-access p {
+  font-size: 12px;
+  line-height: 1.7;
+  margin: 9px 0 12px;
+  color: var(--muted);
+}
+.test-credentials {
+  display: grid;
+  gap: 5px;
+}
+.test-credentials button {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  text-align: left;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 10px;
+  gap: 2px 8px;
+  min-width: 0;
+}
+.test-credentials button:hover {
+  border-color: var(--brand-border);
+  background: var(--brand-soft);
+}
+.test-credentials span {
+  font-size: 11px;
+  color: var(--muted);
+}
+.test-credentials code {
+  grid-column: 1;
+  color: var(--brand);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.test-credentials small {
+  grid-column: 2;
+  grid-row: 1 / 3;
+  align-self: center;
+  font-size: 10px;
+  color: var(--muted);
+}
+.manual-button {
+  font-size: 12px;
+}
+.manual-dialog {
+  margin: auto;
+  width: min(1140px, calc(100vw - 32px));
+  height: min(880px, calc(100dvh - 32px));
+  padding: 0;
+  background: var(--card);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  max-width: none;
+  max-height: none;
+  pointer-events: auto;
+}
+.manual-dialog::backdrop {
+  background: #160c1399;
+  backdrop-filter: blur(3px);
+}
+.manual-content {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.manual-content > header,
+.manual-content > footer {
+  padding: 16px 20px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+.manual-content > header h2 {
+  flex: 1;
+  font-size: 17px;
+}
+.manual-preview {
+  flex: 1;
+  min-height: 0;
+  background: var(--bg);
+}
+.manual-preview .pdf-canvas {
+  height: 100%;
+}
+.manual-content > footer {
+  border-top: 1px solid var(--line);
+}
+.guide-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  pointer-events: none;
+}
+.guide-mask {
+  position: absolute;
+  inset: 0;
+}
+.guide-blocker {
+  position: absolute;
+  pointer-events: auto;
+}
+.guide-outline {
+  position: fixed;
+  border: 2px solid #e8b4c4;
+  border-radius: 9px;
+  pointer-events: none;
+}
+.guide-tip {
+  position: fixed;
+  width: min(360px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  background: white;
+  color: var(--ink);
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: 0 12px 50px #0003;
+  pointer-events: auto;
+}
+.guide-tip-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 14px;
+}
+.guide-tip h2 {
+  font-size: 19px;
+}
+.guide-tip > p {
+  margin: 12px 0 20px;
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--muted);
+}
+.guide-navigation {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  gap: 10px;
+}
+.guide-tip .manual-button {
+  width: 100%;
+}
+.participant-wait {
+  padding: 18px 22px;
+  color: var(--muted);
+  font-size: 12px;
+}
+@media (max-width: 680px) {
+  .access-help {
+    top: 16px;
+    right: 16px;
+  }
+  .access-page {
+    padding-top: 68px;
+  }
+  .test-access {
+    margin-bottom: 26px;
+  }
+  .manual-content > header {
+    flex-wrap: wrap;
+    padding: 12px;
+  }
+  .manual-content > header h2 {
+    font-size: 14px;
+  }
+  .manual-content > footer {
+    gap: 8px;
+    padding: 12px;
+    flex-wrap: wrap;
+  }
+  .manual-content > footer .btn {
+    padding: 8px 10px;
+    font-size: 11px;
+  }
+  .topbar-actions {
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+}
+.test-access-details > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  list-style: none;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  margin: 0 0 14px;
+}
+.test-access-details > summary::-webkit-details-marker {
+  display: none;
+}
+.test-access-details > summary:hover {
+  color: var(--brand);
+}
+.test-access-details[open] > summary svg {
+  transform: rotate(180deg);
+}
+@supports (interpolate-size: allow-keywords) and
+  selector(details::details-content) {
+  .test-access-details {
+    interpolate-size: allow-keywords;
+  }
+  .test-access-details::details-content {
+    block-size: 0;
+    opacity: 0;
+    overflow: clip;
+    transition:
+      block-size 300ms ease,
+      opacity 220ms ease,
+      content-visibility 300ms allow-discrete;
+  }
+  .test-access-details[open]::details-content {
+    block-size: auto;
+    opacity: 1;
+  }
+}
+.test-access-details > summary svg {
+  transition: transform 300ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .test-access-details::details-content {
+    transition: none;
+  }
+}

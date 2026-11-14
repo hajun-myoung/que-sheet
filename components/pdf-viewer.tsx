@@ -9,15 +9,21 @@ export function PdfViewer({
   page = 1,
   onReady,
   dark = false,
+  sourceUrl,
+  onPages,
 }: {
   submission: Submission;
   page?: number;
   onReady?: () => void;
   dark?: boolean;
+  sourceUrl?: string;
+  onPages?: (pages: number) => void;
 }) {
   const host = useRef<HTMLDivElement>(null),
     canvas = useRef<HTMLCanvasElement>(null),
-    ready = useRef(onReady);
+    ready = useRef(onReady),
+    pagesReady = useRef(onPages);
+  pagesReady.current = onPages;
   ready.current = onReady;
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null),
     [size, setSize] = useState({ w: 800, h: 500 }),
@@ -40,7 +46,10 @@ export function PdfViewer({
     setError("");
     setLoading(true);
     (async () => {
-      const [lib, url] = await Promise.all([pdfjs(), pdfUrl(submission)]);
+      const [lib, url] = await Promise.all([
+        pdfjs(),
+        sourceUrl ?? pdfUrl(submission),
+      ]);
       objectUrl = url;
       const task = lib.getDocument({ url });
       task.onPassword = () => {
@@ -53,6 +62,7 @@ export function PdfViewer({
         return;
       }
       setDoc(document);
+      pagesReady.current?.(document.numPages);
     })().catch((e) => {
       if (!disposed) {
         setError(message(e));
@@ -64,7 +74,7 @@ export function PdfViewer({
       void document?.destroy();
       if (objectUrl?.startsWith("blob:")) URL.revokeObjectURL(objectUrl);
     };
-  }, [submission.id, retry]);
+  }, [submission.id, sourceUrl, retry]);
   useEffect(() => {
     if (!doc || !canvas.current) return;
     let cancelled = false,

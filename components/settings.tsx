@@ -1,7 +1,7 @@
 "use client";
 import { GeneralSettings } from "./general-settings";
 import { ParticipantCodes } from "./participant-codes";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Check,
   Clock3,
@@ -27,11 +27,13 @@ import {
 import Footer from "./footer";
 export function SettingsPanel({
   data,
+  guideTab,
   run,
   refresh,
   openEvent,
 }: {
   data: Snapshot;
+  guideTab?: string;
   openEvent: (id: string) => void;
   refresh: () => Promise<void>;
   run: (kind: string, payload: Record<string, unknown>) => Promise<void>;
@@ -42,6 +44,9 @@ export function SettingsPanel({
     [error, setError] = useState(""),
     [saving, setSaving] = useState(false),
     [notice, setNotice] = useState("");
+  useEffect(() => {
+    if (guideTab) setTab(guideTab);
+  }, [guideTab]);
   const current = data.rubrics.find(
     (r) => r.id === data.event.current_rubric_id,
   )!;
@@ -95,6 +100,7 @@ export function SettingsPanel({
           ["rubric", "평가 기준"],
         ].map(([id, label]) => (
           <button
+            data-guide={`settings-tab-${id}`}
             key={id}
             aria-pressed={tab === id}
             className={tab === id ? "active" : ""}
@@ -118,7 +124,7 @@ export function SettingsPanel({
       )}
       {tab === "timer" && (
         <div className="settings-grid">
-          <section className="card settings-card">
+          <section className="card settings-card" data-guide="timer-settings">
             <div className="section-title">
               <h2>
                 <Clock3 size={20} />
@@ -235,7 +241,7 @@ export function SettingsPanel({
       {tab === "teams" && (
         <div className="settings-grid">
           <ParticipantCodes data={data} refresh={refresh} run={run} />
-          <section className="card settings-card">
+          <section className="card settings-card" data-guide="team-settings">
             <h2>팀 등록</h2>
             <form
               onSubmit={(e) => {
@@ -318,7 +324,10 @@ export function SettingsPanel({
                 </div>
               ))}
           </section>
-          <section className="card settings-card member-invite">
+          <section
+            className="card settings-card member-invite"
+            data-guide="judge-settings"
+          >
             <h2>
               <Mail size={20} />
               멤버 초대
@@ -483,7 +492,10 @@ export function SettingsPanel({
         </div>
       )}
       {tab === "rubric" && (
-        <section className="card settings-card rubric-editor">
+        <section
+          className="card settings-card rubric-editor"
+          data-guide="rubric-settings"
+        >
           <div className="section-title">
             <div>
               <h2>평가 기준</h2>

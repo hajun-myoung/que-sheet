@@ -1,4 +1,6 @@
 "use client";
+import { HelpGuide } from "./help";
+import { testMode, homeHref } from "@/lib/test-workspace";
 import { useConfirm } from "./confirm";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
@@ -66,6 +68,7 @@ export function Workspace() {
   const confirm = useConfirm();
   const store = useWorkspace(),
     { data, mutate } = store;
+  const [guideTab, setGuideTab] = useState("timer");
   const [view, setView] = useState("dashboard"),
     [codeEntry, setCodeEntry] = useState(false),
     [selected, setSelected] = useState(""),
@@ -238,7 +241,7 @@ export function Workspace() {
   return (
     <div className="app-shell">
       <aside className="app-nav" inert={presenting || practicing}>
-        <a className="brand" href="/" aria-label="큐 홈">
+        <a className="brand" href={homeHref} aria-label="큐 홈">
           <span className="brand-mark">
             q<span>•</span>
           </span>
@@ -279,6 +282,7 @@ export function Workspace() {
                 </span>
               </button>
               <button
+                data-guide="settings-nav"
                 className={view === "settings" ? "active" : ""}
                 onClick={() => navigate(() => setView("settings"))}
               >
@@ -338,6 +342,13 @@ export function Workspace() {
             </strong>
           </div>
           <div className="topbar-actions">
+            <HelpGuide
+              role={data.me.role}
+              prepare={(step) => {
+                if (step.view) setView(step.view);
+                if (step.tab) setGuideTab(step.tab);
+              }}
+            />
             <span
               className={`connection ${store.connection !== "online" ? "offline" : ""}`}
             >
@@ -354,7 +365,7 @@ export function Workspace() {
             </span>
             {!configured && (
               <div className="demo-switch">
-                <span>DEMO</span>
+                <span>TEST</span>
                 <button
                   className="text-button"
                   onClick={() =>
@@ -424,10 +435,13 @@ export function Workspace() {
               <span className="demo-dot" />
               체험용 데모{" "}
               <span>
-                데이터는 현재 브라우저에만 저장됩니다. 실제 행사 연결은 Supabase
-                설정 후 사용할 수 있습니다.
+                변경사항은 이 브라우저에만 저장되며 서버로 전송되지 않습니다.
               </span>
-              <a href="/?role=judge" target="_blank" rel="noreferrer">
+              <a
+                href={testMode ? "/?demo=1&role=judge" : "/?role=judge"}
+                target="_blank"
+                rel="noreferrer"
+              >
                 심사 화면 열기 <ExternalLink size={12} />
               </a>
             </div>
@@ -522,7 +536,7 @@ export function Workspace() {
                 </div>
               )}
               <div className="workspace-grid">
-                <section className="card team-list">
+                <section className="card team-list" data-guide="team-list">
                   <div className="team-list-heading">
                     <h2>
                       {judge ? "심사 팀" : "참여 팀"}
@@ -732,7 +746,7 @@ export function Workspace() {
                             </div>
                             {pdf && <span className="muted small">PDF</span>}
                           </div>
-                          <div className="preview-stage">
+                          <div className="preview-stage" data-guide="preview">
                             {pdf ? (
                               <PdfViewer submission={pdf} page={previewPage} />
                             ) : (
@@ -790,6 +804,7 @@ export function Workspace() {
                             </p>
                             {operator && (
                               <button
+                                data-guide="start"
                                 className="btn primary start-button"
                                 disabled={!pdf || busy || Boolean(session)}
                                 onClick={() => void start()}
@@ -799,16 +814,21 @@ export function Workspace() {
                               </button>
                             )}
                             {!operator && (
-                              <Practice
-                                data={data}
-                                team={team}
-                                onOpenChange={setPracticing}
-                              />
+                              <div data-guide="practice">
+                                <Practice
+                                  data={data}
+                                  team={team}
+                                  onOpenChange={setPracticing}
+                                />
+                              </div>
                             )}
                           </div>
                         </section>
                         {!operator && session?.team_id === team.id && (
-                          <section className="card participant-remote">
+                          <section
+                            className="card participant-remote"
+                            data-guide="participant-live"
+                          >
                             <div>
                               <span className="badge light-crimson">
                                 <Radio size={13} />
@@ -861,7 +881,19 @@ export function Workspace() {
                             </div>
                           </section>
                         )}
-                        <section className="card upload-card">
+                        {!operator && session?.team_id !== team.id && (
+                          <section
+                            className="card participant-wait"
+                            data-guide="participant-live"
+                          >
+                            운영자가 이 팀의 발표를 시작하면 장표 이동 버튼이
+                            표시됩니다.
+                          </section>
+                        )}
+                        <section
+                          className="card upload-card"
+                          data-guide="upload"
+                        >
                           <Upload
                             key={team.id}
                             data={data}
@@ -906,6 +938,7 @@ export function Workspace() {
           )}
           {view === "settings" && operator && (
             <SettingsPanel
+              guideTab={guideTab}
               openEvent={store.setEventId}
               refresh={store.refresh}
               key={data.event.id}

@@ -181,6 +181,11 @@ export function ParticipantCodes({
         "코드를 복사하거나 일괄 초대로 전달해 주세요. 코드를 재발급한 팀의 등록 멤버는 발송 대기로 변경됩니다.",
       );
       await refresh();
+      window.dispatchEvent(
+        new CustomEvent("cue-command-complete", {
+          detail: { kind: "participant-code" },
+        }),
+      );
     } catch (e) {
       setError(message(e));
     } finally {
@@ -189,7 +194,10 @@ export function ParticipantCodes({
     }
   }
   return (
-    <section className="card settings-card participant-codes">
+    <section
+      className="card settings-card participant-codes"
+      data-guide="participant-codes"
+    >
       <h2>
         <KeyRound size={20} />
         참여 코드 발급

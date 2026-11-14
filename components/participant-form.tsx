@@ -7,6 +7,8 @@ import {
   ShieldCheck,
   UploadCloud,
 } from "lucide-react";
+import { HelpGuide } from "./help";
+import { homeHref } from "@/lib/test-workspace";
 import { useConfirm } from "./confirm";
 import { message, uploadPdf } from "@/lib/client";
 import {
@@ -106,7 +108,7 @@ export function ParticipantForm({
   return (
     <main className="survey-page">
       <header className="survey-nav">
-        <a href="/" className="access-brand">
+        <a href={homeHref} className="access-brand">
           <span className="brand-mark">
             q<span>•</span>
           </span>
@@ -134,6 +136,7 @@ export function ParticipantForm({
           <LogOut size={15} />
           로그인 화면
         </button>
+        <HelpGuide role="submission" />
       </header>
       <form
         className="survey-form"
@@ -158,7 +161,7 @@ export function ParticipantForm({
           </div>
           <p className="required-note">* 필수 입력 항목</p>
         </section>
-        <section className="card survey-question">
+        <section className="card survey-question" data-guide="team-profile">
           <label className="field" htmlFor="survey-team">
             팀명 <span className="required">*</span>
             <input
@@ -182,6 +185,7 @@ export function ParticipantForm({
           <p className="help">PDF · 최대 20MB · 500페이지 · 암호 없는 파일</p>
           <div
             className="survey-upload"
+            data-guide="submission-pdf"
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => {
               e.preventDefault();
@@ -288,7 +292,7 @@ export function ParticipantForm({
             )}
           </div>
         )}
-        <div className="survey-submit">
+        <div className="survey-submit" data-guide="submission-submit">
           <span>제출한 정보는 행사 운영에 사용됩니다.</span>
           <button className="btn primary" disabled={busy}>
             {busy ? "제출 중…" : error ? "다시 제출" : "제출하기"}

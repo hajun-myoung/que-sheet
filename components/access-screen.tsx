@@ -9,6 +9,9 @@ import {
   MonitorPlay,
   Users,
 } from "lucide-react";
+import { TestAccess } from "./test-access";
+import { HelpGuide } from "./help";
+import { testAccount, testMode, homeHref } from "@/lib/test-workspace";
 import { configured, supabase, message } from "@/lib/client";
 import { roleLabel, uuid, type Role } from "@/lib/model";
 export function AccessScreen({
@@ -30,7 +33,8 @@ export function AccessScreen({
   logout: () => Promise<void>;
   recovery?: React.ReactNode;
 }) {
-  const signedIn = configured && Boolean(accountEmail);
+  const [sampleSelected, setSampleSelected] = useState(false);
+  const signedIn = configured && Boolean(accountEmail) && !sampleSelected;
   const [role, setRole] = useState<Role>(signedIn ? "operator" : "participant"),
     [code, setCode] = useState(""),
     [email, setEmail] = useState(""),
@@ -58,8 +62,13 @@ export function AccessScreen({
     setBusy(true);
     setNotice("");
     try {
+      const credential = role === "participant" ? code : email;
+      if (!testMode && testAccount(role, credential)) {
+        await login(role, credential);
+        return;
+      }
       if (!configured || role === "participant") {
-        await login(role, code);
+        await login(role, credential);
         return;
       }
       if (action === "create") {
@@ -102,8 +111,16 @@ export function AccessScreen({
   }
   return (
     <main className="access-page">
+      <header className="access-help">
+        <HelpGuide role="signin" />
+        {testMode && (
+          <a className="text-button" href="/">
+            실제 서비스로 돌아가기
+          </a>
+        )}
+      </header>
       <section className="access-intro">
-        <a className="access-brand" href="/">
+        <a className="access-brand" href={homeHref}>
           <span className="brand-mark">
             q<span>•</span>
           </span>
@@ -125,6 +142,15 @@ export function AccessScreen({
           <span>02 발표연습</span>
           <span>03 심사와 피드백</span>
         </div>
+        <TestAccess
+          select={(nextRole, credential) => {
+            setSampleSelected(true);
+            setRole(nextRole);
+            if (nextRole === "participant") setCode(credential);
+            else setEmail(credential);
+            setNotice("");
+          }}
+        />
       </section>
       <section className="card access-card">
         <span className="eyebrow">
@@ -143,6 +169,7 @@ export function AccessScreen({
           </p>
         )}
         <div
+          data-guide="roles"
           className="role-picker"
           role="group"
           aria-label={signedIn ? "이어서 할 작업" : "로그인 역할"}
@@ -160,6 +187,7 @@ export function AccessScreen({
               className={role === value ? "active" : ""}
               disabled={busy}
               onClick={() => {
+                setSampleSelected(false);
                 setRole(value);
                 setNotice("");
               }}
@@ -170,7 +198,7 @@ export function AccessScreen({
             </button>
           ))}
         </div>
-        {!configured && (
+        {!configured && !testMode && (
           <div className="access-demo">
             <strong>데모 체험</strong>
             <span>
@@ -181,6 +209,7 @@ export function AccessScreen({
         )}
         {(!signedIn || role === "participant") && (
           <form
+            data-guide="credentials"
             onSubmit={(e) => {
               e.preventDefault();
               void submit();
@@ -205,7 +234,7 @@ export function AccessScreen({
                   첫 접속 후 팀 정보와 PDF를 제출합니다. 제출한 팀은 같은 코드로
                   다시 접속할 수 있습니다.
                 </p>
-                {!configured && (
+                {!configured && !testMode && (
                   <p className="demo-code-hint">
                     첫 제출 체험:{" "}
                     <button type="button" onClick={() => setCode("CUE2026")}>
@@ -218,7 +247,7 @@ export function AccessScreen({
                   </p>
                 )}
               </>
-            ) : configured ? (
+            ) : configured || testMode ? (
               <label className="field">
                 {roleLabel[role]} 이메일
                 <input
@@ -239,7 +268,7 @@ export function AccessScreen({
             <button className="btn primary access-submit" disabled={busy}>
               {role === "participant" ? (
                 <KeyRound size={17} />
-              ) : configured ? (
+              ) : configured || testMode ? (
                 <Mail size={17} />
               ) : (
                 <ArrowRight size={17} />
@@ -248,9 +277,11 @@ export function AccessScreen({
                 ? "확인 중…"
                 : role === "participant"
                   ? "코드로 접속하기"
-                  : configured
-                    ? "이메일로 로그인"
-                    : `${roleLabel[role]}${role === "judge" ? "으로" : "로"} 체험하기`}
+                  : testMode || testAccount(role, email)
+                    ? "테스트 계정으로 접속"
+                    : configured
+                      ? "이메일로 로그인"
+                      : `${roleLabel[role]}${role === "judge" ? "으로" : "로"} 체험하기`}
             </button>
           </form>
         )}

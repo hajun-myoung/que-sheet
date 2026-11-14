@@ -104,7 +104,7 @@ export function ReviewForm({
     }
   }
   return (
-    <section className="card review-form">
+    <section className="card review-form" data-guide="review">
       <div className="section-title">
         <div>
           <span className="eyebrow">EVALUATION</span>
@@ -135,69 +135,71 @@ export function ReviewForm({
           </button>
         </div>
       )}
-      <div className="criterion-list">
-        {rubric.items.map((item, i) => (
-          <div className="criterion" key={item.id}>
-            <span className="criterion-number">0{i + 1}</span>
-            <div className="grow">
-              <label htmlFor={`score-${item.id}`}>
-                {item.name}
-                <span className="required"> *</span>
-              </label>
-              <p>{item.description}</p>
+      <div data-guide="scores">
+        <div className="criterion-list">
+          {rubric.items.map((item, i) => (
+            <div className="criterion" key={item.id}>
+              <span className="criterion-number">0{i + 1}</span>
+              <div className="grow">
+                <label htmlFor={`score-${item.id}`}>
+                  {item.name}
+                  <span className="required"> *</span>
+                </label>
+                <p>{item.description}</p>
+              </div>
+              <div className="score-input">
+                <input
+                  id={`score-${item.id}`}
+                  aria-label={`${item.name} 점수`}
+                  type="number"
+                  min="0"
+                  max={item.max}
+                  step="0.1"
+                  disabled={!ev || locked || busy}
+                  value={scores[item.id] ?? ""}
+                  placeholder="—"
+                  onChange={(e) => {
+                    const next = { ...scores };
+                    if (e.target.value === "") delete next[item.id];
+                    else next[item.id] = Number(e.target.value);
+                    setScores(next);
+                    setDirty(true);
+                    setStatus("저장되지 않은 변경");
+                  }}
+                />
+                <span>/ {item.max}</span>
+              </div>
             </div>
-            <div className="score-input">
-              <input
-                id={`score-${item.id}`}
-                aria-label={`${item.name} 점수`}
-                type="number"
-                min="0"
-                max={item.max}
-                step="0.1"
-                disabled={!ev || locked || busy}
-                value={scores[item.id] ?? ""}
-                placeholder="—"
-                onChange={(e) => {
-                  const next = { ...scores };
-                  if (e.target.value === "") delete next[item.id];
-                  else next[item.id] = Number(e.target.value);
-                  setScores(next);
-                  setDirty(true);
-                  setStatus("저장되지 않은 변경");
-                }}
-              />
-              <span>/ {item.max}</span>
-            </div>
-          </div>
-        ))}
+          ))}
+        </div>
+        <div className="score-total">
+          <span>
+            합계 점수<small>{rubric.items.length}개 평가 항목</small>
+          </span>
+          <strong>
+            {Object.values(scores)
+              .reduce((a, b) => a + b, 0)
+              .toFixed(1)}{" "}
+            <small>/ {rubric.items.reduce((a, i) => a + i.max, 0)}</small>
+          </strong>
+        </div>
+        <label className="field">
+          비고 및 심사 의견
+          <textarea
+            maxLength={5000}
+            rows={4}
+            disabled={!ev || locked || busy}
+            placeholder="팀에게 전달하고 싶은 피드백이나 평가 의견을 남겨 주세요."
+            value={notes}
+            onChange={(e) => {
+              setNotes(e.target.value);
+              setDirty(true);
+              setStatus("저장되지 않은 변경");
+            }}
+          />
+          <small>{notes.length.toLocaleString()} / 5,000</small>
+        </label>
       </div>
-      <div className="score-total">
-        <span>
-          합계 점수<small>{rubric.items.length}개 평가 항목</small>
-        </span>
-        <strong>
-          {Object.values(scores)
-            .reduce((a, b) => a + b, 0)
-            .toFixed(1)}{" "}
-          <small>/ {rubric.items.reduce((a, i) => a + i.max, 0)}</small>
-        </strong>
-      </div>
-      <label className="field">
-        비고 및 심사 의견
-        <textarea
-          maxLength={5000}
-          rows={4}
-          disabled={!ev || locked || busy}
-          placeholder="팀에게 전달하고 싶은 피드백이나 평가 의견을 남겨 주세요."
-          value={notes}
-          onChange={(e) => {
-            setNotes(e.target.value);
-            setDirty(true);
-            setStatus("저장되지 않은 변경");
-          }}
-        />
-        <small>{notes.length.toLocaleString()} / 5,000</small>
-      </label>
       {error && (
         <div className="error" role="alert">
           {error}
@@ -234,7 +236,7 @@ export function ReviewForm({
           </div>
         </div>
       )}
-      <div className="form-footer">
+      <div className="form-footer" data-guide="review-save">
         <span className="save-status" role="status">
           {status === "저장 완료" || locked ? <CheckCircle2 size={16} /> : null}
           {locked
@@ -276,7 +278,7 @@ export function Results({
   const submitted = data.evaluations.filter((e) => e.status === "submitted");
   const groups = groupTeamResults(data);
   return (
-    <div className="results">
+    <div className="results" data-guide="results">
       <div className="page-heading">
         <div>
           <span className="eyebrow">JUDGING OVERVIEW</span>

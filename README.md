@@ -28,6 +28,18 @@ npm run dev
 - 샘플 PDF는 `public/sample.pdf`에 포함된 6장짜리 자체 제작 벡터 자료입니다. 재생성: `node scripts/create-sample.mjs`.
 - 데모를 초기화할 때는 브라우저 사이트 데이터의 `cue-demo-v1`와 `cue-pdfs`를 지웁니다. 제출한 데모 파일도 삭제되므로 필요한 파일을 먼저 보관하세요.
 
+## 처음 사용하는 사람을 위한 체험과 가이드
+
+서버가 연결된 서비스에서도 로그인 화면 왼쪽의 테스트 안내를 이용할 수 있습니다. ‘자세히보기’를 눌러 예시 계정을 펼칩니다. 계정 항목을 누르면 입력란에 코드나 이메일이 채워지며 접속 버튼으로 테스트 워크스페이스가 열립니다.
+
+- 참여 코드 `TRYTEAM1`, `TRYTEAM2`, `TRYTEAM3`으로 예시 팀 3개에 접속합니다. 세 번째 팀은 첫 제출을 연습할 수 있습니다.
+- 운영자는 `operator@demo.cuesheet.example`, 심사위원은 `judge1@demo.cuesheet.example`, `judge2@demo.cuesheet.example`을 사용합니다. 이 이메일은 로컬 테스트용이며 인증 메일을 발송하지 않습니다.
+- 테스트는 `?demo=1` 모드에서 Supabase 클라이언트를 생성하지 않습니다. 상태는 별도 `cue-test-workspace-v1` localStorage, 접속 역할은 탭별 `cue-test-access` sessionStorage, 업로드 파일은 별도 `cue-test-pdfs` IndexedDB에 저장됩니다. 같은 브라우저·origin의 테스트 탭끼리만 변경사항을 공유합니다.
+- 역할 전환은 헤더의 로그인 버튼에서 진행합니다. 실제 서비스로 돌아가기는 테스트 로그인 화면의 링크를 사용합니다. 팀 코드를 재발급하면 원래 테스트 코드도 만료되므로 새 코드를 사용하세요.
+- 로그인과 역할별 화면의 동그란 물음표 버튼으로 가이드를 실행합니다. 하이라이트한 항목을 조작하거나 화살표로 이동하고 Skip 또는 Esc로 종료합니다. 설정 저장 등 지정한 작업이 성공하면 다음 단계로 진행합니다.
+- 테스트 안내와 가이드의 PDF 버튼에서 설명서를 미리 보고 다운로드합니다. 한국어·English 선택은 안내·가이드·PDF에 함께 적용되고 브라우저에 저장됩니다. 기존 업무 화면의 기본 언어는 한국어입니다.
+- `public/manuals/cuesheet-ko.pdf`, `public/manuals/cuesheet-en.pdf`는 역할별 24단계의 실제 캡처와 설명을 담고 있습니다. 설명 원문과 순서는 `lib/guide.ts`가 소유합니다. 화면이나 원문이 바뀌면 PDF 캡처도 갱신해야 합니다.
+
 ## 실제 Supabase 연결
 
 1. Supabase 프로젝트를 생성합니다. Project URL과 publishable key(또는 legacy anon key)를 확인합니다.
@@ -127,7 +139,7 @@ CUE_TEST_DATABASE_URL=postgresql://USER@localhost:5432/cue_test_validation \
 
 ## 실제 프로젝트 연결
 
-`Academic Festival` (`nidalecwnnxlmxptibua`)에 연결했습니다. 이 작업 공간의 `.env.local`에는 Project URL과 publishable key만 있으며 Git에서 제외됩니다. 실제 연결 후에는 데모 역할 버튼과 `CUE2026` 같은 데모 코드가 적용되지 않습니다. 운영자 이메일 로그인 → 행사 생성 → 팀 등록 → 참여 코드 발급 순서로 시작하세요.
+`Academic Festival` (`nidalecwnnxlmxptibua`)에 연결했습니다. 이 작업 공간의 `.env.local`에는 Project URL과 publishable key만 있으며 Git에서 제외됩니다. 실제 연결 후에도 위 테스트 계정은 별도의 로컬 체험으로 접속할 수 있습니다. 기존 환경변수 미설정용 `CUE2026` 데모 코드는 실제 행사에 적용되지 않습니다. 운영자 이메일 로그인 → 행사 생성 → 팀 등록 → 참여 코드 발급 순서로 시작하세요.
 
 원격 최초 배포 시 Supabase가 발급한 migration version에 맞춰 기존 두 SQL 파일 이름을 정렬했습니다. SQL 내용은 그대로이며, `supabase db push`가 이미 설치된 테이블을 재생성하지 않도록 원격 이력과 이름을 맞춘 것입니다. 초기 데모 시절 파일 이름은 이전 Git 커밋에서 확인할 수 있습니다. 이후 원격 이력과 로컬 파일을 각각 수정하지 말고 함께 관리하세요.
 
