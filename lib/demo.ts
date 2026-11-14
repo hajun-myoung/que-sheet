@@ -134,8 +134,9 @@ export function visible(
   state: Snapshot,
   role: Role,
   participantTeam?: string,
+  userId = demoUsers[role],
 ): Snapshot {
-  const original = state.members.find((x) => x.user_id === demoUsers[role])!;
+  const original = state.members.find((x) => x.user_id === userId)!;
   const me =
     role === "participant" && participantTeam
       ? { ...original, team_id: participantTeam }
@@ -176,10 +177,11 @@ export function reduce(
   role: Role,
   now = Date.now(),
   participantTeam?: string,
+  userId = demoUsers[role],
 ): Snapshot {
   const s = structuredClone(state),
     p = cmd.payload,
-    original = s.members.find((x) => x.user_id === demoUsers[role])!,
+    original = s.members.find((x) => x.user_id === userId)!,
     me =
       role === "participant" && participantTeam
         ? { ...original, team_id: participantTeam }

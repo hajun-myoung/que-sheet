@@ -3,6 +3,12 @@ import { createClient } from "@supabase/supabase-js";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { seed, reduce, visible } from "./demo";
 import {
+  testMode,
+  seedTestWorkspace,
+  enterTestWorkspace,
+  testAccount,
+} from "./test-workspace";
+import {
   uuid,
   type Command,
   type Snapshot,
@@ -15,9 +21,10 @@ import {
 } from "./model";
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL,
   key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-export const configured = Boolean(url && key);
+export const configured = Boolean(url && key) && !testMode;
 export const supabase = configured ? createClient(url!, key!) : null;
-const STORE = "cue-demo-v1";
+const STORE = testMode ? "cue-test-workspace-v1" : "cue-demo-v1";
+const ACCESS = testMode ? "cue-test-access" : "cue-access";
 type LocalStore = {
   state: Snapshot;
   receipts: Record<string, { fingerprint: string; actor: string }>;
@@ -27,11 +34,17 @@ function readLocal(): LocalStore {
   const raw = localStorage.getItem(STORE);
   const data: LocalStore = raw
     ? JSON.parse(raw)
-    : { state: seed(), receipts: {} };
-  data.accessCodes ??= {
-    CUE2026: { team_id: "team-5", expires_at: "2099-01-01" },
-    READY2026: { team_id: "team-1", expires_at: "2099-01-01" },
-  };
+    : { state: testMode ? seedTestWorkspace() : seed(), receipts: {} };
+  data.accessCodes ??= testMode
+    ? {
+        TRYTEAM1: { team_id: "team-1", expires_at: "2099-01-01" },
+        TRYTEAM2: { team_id: "team-2", expires_at: "2099-01-01" },
+        TRYTEAM3: { team_id: "team-3", expires_at: "2099-01-01" },
+      }
+    : {
+        CUE2026: { team_id: "team-5", expires_at: "2099-01-01" },
+        READY2026: { team_id: "team-1", expires_at: "2099-01-01" },
+      };
   return data;
 }
 function announce() {
@@ -47,8 +60,17 @@ export function request(
 ): Command {
   return { kind, event_id, request_id: uuid(), payload };
 }
-async function localMutate(command: Command, role: Role, teamId?: string) {
-  const actor = role === "participant" ? `${role}:${teamId}` : role;
+async function localMutate(
+  command: Command,
+  role: Role,
+  teamId?: string,
+  userId?: string,
+) {
+  const actor = testMode
+    ? `${userId ?? role}:${teamId ?? ""}`
+    : role === "participant"
+      ? `${role}:${teamId}`
+      : role;
   await navigator.locks.request(STORE, async () => {
     const data = readLocal(),
       fingerprint = JSON.stringify(command),
@@ -58,7 +80,7 @@ async function localMutate(command: Command, role: Role, teamId?: string) {
         throw Error("동일한 요청 ID를 다른 내용에 사용할 수 없습니다.");
       return;
     }
-    data.state = reduce(data.state, command, role, Date.now(), teamId);
+    data.state = reduce(data.state, command, role, Date.now(), teamId, userId);
     data.receipts[command.request_id] = { fingerprint, actor };
     localStorage.setItem(STORE, JSON.stringify(data));
   });
@@ -90,6 +112,17 @@ export function useWorkspace() {
     try {
       let result: Snapshot;
       if (!supabase) {
+        const pending = testMode
+          ? sessionStorage.getItem("cue-test-pending")
+          : null;
+        if (pending) {
+          sessionStorage.removeItem("cue-test-pending");
+          const entry = JSON.parse(pending);
+          sessionStorage.setItem(
+            ACCESS,
+            JSON.stringify(localIdentity(entry.role, entry.credential)),
+          );
+        }
         const identity = readDemoAccess();
         if (!identity) {
           setAuthed(false);
@@ -98,7 +131,13 @@ export function useWorkspace() {
         }
         setAuthed(true);
         setRole(identity.role);
-        result = visible(readLocal().state, identity.role, identity.team_id);
+        result = visible(
+          readLocal().state,
+          identity.role,
+          identity.team_id,
+          identity.user_id,
+        );
+        setAccountEmail(identity.email ?? null);
       } else {
         const {
           data: { session },
@@ -231,9 +270,19 @@ export function useWorkspace() {
         } else {
           const identity = readDemoAccess();
           if (!identity) throw Error("로그인이 필요합니다.");
-          await localMutate(command, identity.role, identity.team_id);
+          await localMutate(
+            command,
+            identity.role,
+            identity.team_id,
+            identity.user_id,
+          );
         }
         await refresh();
+        window.dispatchEvent(
+          new CustomEvent("cue-command-complete", {
+            detail: { kind: command.kind },
+          }),
+        );
       } catch (e) {
         await refresh();
         throw Error(message(e));
@@ -242,17 +291,14 @@ export function useWorkspace() {
     [refresh],
   );
   async function login(nextRole: Role, code = "") {
+    if (!testMode && testAccount(nextRole, code)) {
+      enterTestWorkspace(nextRole, code);
+      return;
+    }
     if (!supabase) {
-      let team_id: string | undefined;
-      if (nextRole === "participant") {
-        const entry = readLocal().accessCodes![normalizeCode(code)];
-        if (!entry || Date.parse(entry.expires_at) <= Date.now())
-          throw Error("코드가 올바르지 않거나 만료되었습니다.");
-        team_id = entry.team_id;
-      }
       sessionStorage.setItem(
-        "cue-access",
-        JSON.stringify({ role: nextRole, team_id }),
+        ACCESS,
+        JSON.stringify(localIdentity(nextRole, code)),
       );
       await refresh();
       return;
@@ -278,7 +324,7 @@ export function useWorkspace() {
     if (supabase) {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
-    } else sessionStorage.removeItem("cue-access");
+    } else sessionStorage.removeItem(ACCESS);
     generation.current++;
     setData(null);
     setAuthed(false);
@@ -326,7 +372,7 @@ export function pdfjs() {
 }
 async function pdfDatabase() {
   return await new Promise<IDBDatabase>((resolve, reject) => {
-    const req = indexedDB.open("cue-pdfs", 1);
+    const req = indexedDB.open(testMode ? "cue-test-pdfs" : "cue-pdfs", 1);
     req.onupgradeneeded = () => req.result.createObjectStore("files");
     req.onerror = () => reject(req.error);
     req.onsuccess = () => resolve(req.result);
@@ -478,8 +524,39 @@ export async function uploadPdf(
   });
 }
 
-function readDemoAccess(): { role: Role; team_id?: string } | null {
-  const raw = sessionStorage.getItem("cue-access");
+function localIdentity(role: Role, credential: string) {
+  const account = testMode ? testAccount(role, credential) : undefined;
+  let team_id: string | undefined;
+  const local = readLocal();
+  if (role === "participant") {
+    const entry = local.accessCodes![normalizeCode(credential)];
+    if (!entry || Date.parse(entry.expires_at) <= Date.now())
+      throw Error("코드가 올바르지 않거나 만료되었습니다.");
+    team_id = entry.team_id;
+  } else if (testMode && !account) {
+    throw Error("안내에 있는 테스트 이메일을 입력해 주세요.");
+  }
+  const member =
+    role === "participant"
+      ? local.state.members.find(
+          (m) => m.role === role && m.team_id === team_id,
+        )
+      : undefined;
+  return {
+    role,
+    team_id,
+    user_id: account?.user_id ?? member?.user_id,
+    email: role === "participant" ? null : account?.credential,
+  };
+}
+
+function readDemoAccess(): {
+  role: Role;
+  team_id?: string;
+  user_id?: string;
+  email?: string;
+} | null {
+  const raw = sessionStorage.getItem(ACCESS);
   if (!raw) return null;
   const value = JSON.parse(raw);
   return ["operator", "participant", "judge"].includes(value.role)
